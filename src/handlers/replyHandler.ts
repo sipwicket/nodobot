@@ -1,19 +1,12 @@
-import { Context, NarrowedContext } from 'telegraf/typings'
+import { Context } from 'telegraf/typings'
 import { Update } from 'telegraf/typings/core/types/typegram'
-import {
-  MessageSubType,
-  MountMap,
-  UpdateType,
-} from 'telegraf/typings/telegram-types'
+import { MatchedContext } from '../types'
 
-type MatchedContext<
-  C extends Context,
-  T extends UpdateType | MessageSubType
-> = NarrowedContext<C, MountMap[T]>
+import config from '../../config.json'
 
 export const replyHandler = (ctx: MatchedContext<Context<Update>, 'text'>) => {
   return ctx.reply(
-    `Please refrain from @ing me in the future, ${ctx.message.from.first_name}.`,
+    `${config.messages.directReplyNoOp} ${ctx.message.from.first_name}.`,
     { reply_to_message_id: ctx.message.message_id }
   )
 }

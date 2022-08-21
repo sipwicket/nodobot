@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { ImageCacheItem } from './imageCache'
 
 const RESIZE_DIMENSIONS = {
   x: 30,
@@ -6,10 +7,18 @@ const RESIZE_DIMENSIONS = {
 }
 
 export const resizeImage = async (image: Buffer) => {
-  const result = sharp(image)
+  const { data, info } = await sharp(image)
     .resize(RESIZE_DIMENSIONS.x, RESIZE_DIMENSIONS.y)
-    .jpeg({ quality: 100, mozjpeg: true })
-    .toBuffer()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
 
-  return result
+  return { data, info }
 }
+
+export const bufferFromCachedImage = (cachedImage: ImageCacheItem) =>
+  sharp(cachedImage.buffer, {
+    raw: { ...cachedImage.info },
+  })
+    .png()
+    .toBuffer()

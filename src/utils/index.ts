@@ -1,3 +1,6 @@
 export * from './downloadToBuffer'
 export * from './resizeImage'
 export * from './imageCache'
+export * from './compareImages'
+export * from './linkCache'
+export * from './getRandomImage'

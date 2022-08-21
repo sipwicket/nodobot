@@ -1,0 +1,12 @@
+{
+  "URL_ENDPOINTS": [
+    "https://imagesapi.com/random" // returns { "url": "https://imagesapi.com/image.jpg" }
+  ],
+  "messages": {
+    "foundLinkSentBy": "Found an identical link! Posted by",
+    "foundImageSentBy": "Found a similar image! Posted by",
+    "minutesAgo": "minutes ago.",
+    "directReplyNoOp": "Functionality not implemented,",
+    "sendingRandomImage": "Here's a random image:"
+  }
+}

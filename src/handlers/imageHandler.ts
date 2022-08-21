@@ -1,34 +1,126 @@
-import { Context, NarrowedContext, Telegraf } from 'telegraf/typings'
+import sharp from 'sharp'
+import { Context, Telegraf } from 'telegraf/typings'
 import { Update } from 'telegraf/typings/core/types/typegram'
 import {
-  MessageSubType,
-  MountMap,
-  UpdateType,
-} from 'telegraf/typings/telegram-types'
-import { downloadToBuffer, resizeImage } from '../utils/index'
+  addToImageCache,
+  bufferFromCachedImage,
+  buildImageCacheItem,
+  compareImages,
+  downloadToBuffer,
+  getImageCache,
+  resizeImage,
+} from '../utils/index'
+import { MatchedContext } from '../types'
 
-type MatchedContext<
-  C extends Context,
-  T extends UpdateType | MessageSubType
-> = NarrowedContext<C, MountMap[T]>
+import config from '../../config.json'
 
-export const imageHandler = async (
+const MIN_MATCHED_PIXELS_THRESHOLD = 100
+
+const downloadAndResizeImage = async (url: string) => {
+  const imageBuffer = await downloadToBuffer(url)
+
+  return await resizeImage(imageBuffer)
+}
+
+const getSimilarImageIndex = (resizedImageObject: {
+  data: Buffer
+  info: sharp.OutputInfo
+}) => {
+  const imageCache = getImageCache()
+
+  let hasFoundSimilar = -1
+  imageCache.forEach((cachedImage, idx) => {
+    const comparison = compareImages(
+      resizedImageObject.data,
+      cachedImage.buffer
+    )
+
+    console.log(`#${idx}: ${comparison}`)
+
+    if (comparison <= MIN_MATCHED_PIXELS_THRESHOLD) {
+      hasFoundSimilar = idx
+      return
+    }
+  })
+
+  return hasFoundSimilar
+}
+
+type ReplyWithPhotoParams = {
+  ctx: MatchedContext<Context<Update>, 'photo'>
+  imageBuffer: Buffer
+  author: string
+  date: number
+  messageId: number
+}
+const replyWithPhoto = ({
+  ctx,
+  imageBuffer,
+  author,
+  date,
+  messageId,
+}: ReplyWithPhotoParams) => {
+  // build date for message
+  const currentDate = new Date().getTime() / 1000
+  const timeDifference = currentDate - date
+  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1)
+
+  return ctx.replyWithPhoto(
+    {
+      source: imageBuffer,
+    },
+    {
+      caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}`,
+      reply_to_message_id: messageId,
+    }
+  )
+}
+
+export const photoMessageHandler = async (
   ctx: MatchedContext<Context<Update>, 'photo'>,
   bot: Telegraf<Context<Update>>
 ) => {
-  const photoId = ctx?.message?.photo[0]?.file_id
+  const {
+    date: messageDate,
+    from: { first_name: authorFirstName },
+    message_id: messageId,
+    photo: messagePhoto,
+  } = ctx.message
+
+  const photoId = messagePhoto?.[0]?.file_id
   if (!photoId) {
     return
   }
 
-  const fileUrl = await bot.telegram.getFileLink(photoId)
-  if (!fileUrl?.href) {
+  const fileLink = await bot.telegram.getFileLink(photoId)
+  if (!fileLink?.href) {
     return
   }
 
-  const imageBuffer = await downloadToBuffer(fileUrl.href)
-  const resized = await resizeImage(imageBuffer)
+  const resizedImageObject = await downloadAndResizeImage(fileLink.href)
+  const similarImageIndex = getSimilarImageIndex(resizedImageObject) // -1 if none found
 
-  console.log(imageBuffer)
-  console.log(resized)
+  if (similarImageIndex === -1) {
+    return addToImageCache(
+      buildImageCacheItem(resizedImageObject, messageDate, authorFirstName)
+    )
+  }
+
+  const imageCache = getImageCache()
+  const {
+    metadata: { date, author },
+  } = imageCache[similarImageIndex]
+
+  // send the thumbnail in the reply, build buffer from raw cached image
+  const cachedImageThumbnailBuffer = await bufferFromCachedImage(
+    imageCache[similarImageIndex]
+  )
+
+  return await replyWithPhoto({
+    ctx: ctx,
+    imageBuffer: cachedImageThumbnailBuffer,
+    author: author,
+    date: date,
+    messageId: messageId,
+  })
 }

@@ -1,17 +1,43 @@
 import { Telegraf } from 'telegraf'
-import { replyHandler, imageHandler } from './src/handlers/index'
+import {
+  replyHandler,
+  photoMessageHandler,
+  entityMessageHandler,
+  directMentionHandler,
+} from './src/handlers/index'
 
-const TELEGRAM_TOKEN = '1937797030:AAHvmInHqtFuAgEmZTdLmkN2pxn1U_3Uk5s'
-const bot = new Telegraf(TELEGRAM_TOKEN)
+import config from './config.json'
 
+// Quit on missing env var
+if (!process.env?.TELEGRAM_TOKEN) {
+  console.error('Failed to get TELEGRAM_TOKEN from env.')
+  process.exit(1)
+}
+// Quit on missing messages json
+if (!config) {
+  console.error('Failed to get config.json in root folder')
+  process.exit(1)
+}
+
+// Instantiate bot
+const bot = new Telegraf(process.env?.TELEGRAM_TOKEN)
+
+// Set up handlers
 bot.on('text', (ctx) => {
+  console.log(ctx.message.entities)
+
   if (ctx?.update?.message?.reply_to_message) {
     return replyHandler(ctx)
   }
+
+  entityMessageHandler(ctx)
+  directMentionHandler(ctx, bot)
 })
 
 bot.on('photo', (ctx) => {
-  imageHandler(ctx, bot)
+  console.log(ctx.message)
+
+  photoMessageHandler(ctx, bot)
 })
 
 bot.launch()
