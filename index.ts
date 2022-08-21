@@ -24,8 +24,6 @@ const bot = new Telegraf(process.env?.TELEGRAM_TOKEN);
 
 // Set up handlers
 bot.on('text', (ctx) => {
-  console.log(ctx.message.entities);
-
   if (ctx?.update?.message?.reply_to_message) {
     const replyUser = ctx?.update?.message?.reply_to_message?.from?.id;
     const botId = bot.botInfo?.id;
@@ -40,8 +38,6 @@ bot.on('text', (ctx) => {
 });
 
 bot.on('photo', (ctx) => {
-  console.log(ctx.message);
-
   photoMessageHandler(ctx, bot);
 });
 

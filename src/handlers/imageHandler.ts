@@ -1,6 +1,6 @@
-import sharp from 'sharp'
-import { Context, Telegraf } from 'telegraf/typings'
-import { Update } from 'telegraf/typings/core/types/typegram'
+import sharp from 'sharp';
+import { Context, Telegraf } from 'telegraf/typings';
+import { Update } from 'telegraf/typings/core/types/typegram';
 import {
   addToImageCache,
   bufferFromCachedImage,
@@ -9,50 +9,48 @@ import {
   downloadToBuffer,
   getImageCache,
   resizeImage,
-} from '../utils/index'
-import { MatchedContext } from '../types'
+} from '../utils/index';
+import { MatchedContext } from '../types';
 
-import config from '../../config.json'
+import config from '../../config.json';
 
-const MIN_MATCHED_PIXELS_THRESHOLD = 100
+const MIN_MATCHED_PIXELS_THRESHOLD = 100;
 
 const downloadAndResizeImage = async (url: string) => {
-  const imageBuffer = await downloadToBuffer(url)
+  const imageBuffer = await downloadToBuffer(url);
 
-  return await resizeImage(imageBuffer)
-}
+  return await resizeImage(imageBuffer);
+};
 
 const getSimilarImageIndex = (resizedImageObject: {
-  data: Buffer
-  info: sharp.OutputInfo
+  data: Buffer;
+  info: sharp.OutputInfo;
 }) => {
-  const imageCache = getImageCache()
+  const imageCache = getImageCache();
 
-  let hasFoundSimilar = -1
+  let hasFoundSimilar = -1;
   imageCache.forEach((cachedImage, idx) => {
     const comparison = compareImages(
       resizedImageObject.data,
       cachedImage.buffer
-    )
-
-    console.log(`#${idx}: ${comparison}`)
+    );
 
     if (comparison <= MIN_MATCHED_PIXELS_THRESHOLD) {
-      hasFoundSimilar = idx
-      return
+      hasFoundSimilar = idx;
+      return;
     }
-  })
+  });
 
-  return hasFoundSimilar
-}
+  return hasFoundSimilar;
+};
 
 type ReplyWithPhotoParams = {
-  ctx: MatchedContext<Context<Update>, 'photo'>
-  imageBuffer: Buffer
-  author: string
-  date: number
-  messageId: number
-}
+  ctx: MatchedContext<Context<Update>, 'photo'>;
+  imageBuffer: Buffer;
+  author: string;
+  date: number;
+  messageId: number;
+};
 const replyWithPhoto = ({
   ctx,
   imageBuffer,
@@ -61,9 +59,9 @@ const replyWithPhoto = ({
   messageId,
 }: ReplyWithPhotoParams) => {
   // build date for message
-  const currentDate = new Date().getTime() / 1000
-  const timeDifference = currentDate - date
-  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1)
+  const currentDate = new Date().getTime() / 1000;
+  const timeDifference = currentDate - date;
+  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1);
 
   return ctx.replyWithPhoto(
     {
@@ -73,8 +71,8 @@ const replyWithPhoto = ({
       caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}`,
       reply_to_message_id: messageId,
     }
-  )
-}
+  );
+};
 
 export const photoMessageHandler = async (
   ctx: MatchedContext<Context<Update>, 'photo'>,
@@ -85,36 +83,36 @@ export const photoMessageHandler = async (
     from: { first_name: authorFirstName },
     message_id: messageId,
     photo: messagePhoto,
-  } = ctx.message
+  } = ctx.message;
 
-  const photoId = messagePhoto?.[0]?.file_id
+  const photoId = messagePhoto?.[0]?.file_id;
   if (!photoId) {
-    return
+    return;
   }
 
-  const fileLink = await bot.telegram.getFileLink(photoId)
+  const fileLink = await bot.telegram.getFileLink(photoId);
   if (!fileLink?.href) {
-    return
+    return;
   }
 
-  const resizedImageObject = await downloadAndResizeImage(fileLink.href)
-  const similarImageIndex = getSimilarImageIndex(resizedImageObject) // -1 if none found
+  const resizedImageObject = await downloadAndResizeImage(fileLink.href);
+  const similarImageIndex = getSimilarImageIndex(resizedImageObject); // -1 if none found
 
   if (similarImageIndex === -1) {
     return addToImageCache(
       buildImageCacheItem(resizedImageObject, messageDate, authorFirstName)
-    )
+    );
   }
 
-  const imageCache = getImageCache()
+  const imageCache = getImageCache();
   const {
     metadata: { date, author },
-  } = imageCache[similarImageIndex]
+  } = imageCache[similarImageIndex];
 
   // send the thumbnail in the reply, build buffer from raw cached image
   const cachedImageThumbnailBuffer = await bufferFromCachedImage(
     imageCache[similarImageIndex]
-  )
+  );
 
   return await replyWithPhoto({
     ctx: ctx,
@@ -122,5 +120,5 @@ export const photoMessageHandler = async (
     author: author,
     date: date,
     messageId: messageId,
-  })
-}
+  });
+};
