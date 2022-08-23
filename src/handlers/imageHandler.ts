@@ -23,26 +23,36 @@ const downloadAndResizeImage = async (url: string) => {
   return await resizeImage(imageBuffer);
 };
 
-const getSimilarImageIndex = (resizedImageObject: {
+const getImageSimilarity = (resizedImageObject: {
   data: Buffer;
   info: sharp.OutputInfo;
-}) => {
+}): {
+  index: number;
+  numOfPixels: number;
+} => {
   const imageCache = getImageCache();
 
-  let hasFoundSimilar = -1;
-  imageCache.forEach((cachedImage, idx) => {
+  const results = {
+    index: -1,
+    numOfPixels: -1,
+  };
+
+  imageCache.some((cachedImage, idx) => {
     const comparison = compareImages(
       resizedImageObject.data,
       cachedImage.buffer
     );
 
     if (comparison <= MIN_MATCHED_PIXELS_THRESHOLD) {
-      hasFoundSimilar = idx;
-      return;
+      results.index = idx;
+      results.numOfPixels = comparison;
+      return true;
     }
+
+    return false;
   });
 
-  return hasFoundSimilar;
+  return results;
 };
 
 type ReplyWithPhotoParams = {
@@ -51,6 +61,7 @@ type ReplyWithPhotoParams = {
   author: string;
   date: number;
   messageId: number;
+  numOfPixels: number;
 };
 const replyWithPhoto = ({
   ctx,
@@ -58,6 +69,7 @@ const replyWithPhoto = ({
   author,
   date,
   messageId,
+  numOfPixels,
 }: ReplyWithPhotoParams) => {
   // build date for message
   const currentDate = new Date().getTime() / 1000;
@@ -69,7 +81,8 @@ const replyWithPhoto = ({
       source: imageBuffer,
     },
     {
-      caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}`,
+      caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.
+${config.messages.similarPixels} ${numOfPixels}/900. ${config.messages.similarityThreshold} ${MIN_MATCHED_PIXELS_THRESHOLD}.`,
       reply_to_message_id: messageId,
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -104,7 +117,8 @@ export const photoMessageHandler = async (
   }
 
   const resizedImageObject = await downloadAndResizeImage(fileLink.href);
-  const similarImageIndex = getSimilarImageIndex(resizedImageObject); // -1 if none found
+  const { index: similarImageIndex, numOfPixels } =
+    getImageSimilarity(resizedImageObject); // -1 if none found
 
   if (similarImageIndex === -1) {
     return addToImageCache(
@@ -128,5 +142,6 @@ export const photoMessageHandler = async (
     author: author,
     date: date,
     messageId: messageId,
+    numOfPixels,
   });
 };

@@ -27,32 +27,36 @@ const bot = new Telegraf(process.env?.TELEGRAM_TOKEN);
 
 // commands
 bot.command(config.messages.increaseSensitivityCommand, (ctx) => {
-  const THRESHOLD_CHANGE = 0.05;
   const currentThreshold = getComparisonSetting('threshold');
-  let newThreshold = currentThreshold - THRESHOLD_CHANGE;
+
+  let newThreshold = currentThreshold + THRESHOLD_CHANGE;
   if (newThreshold < 0.05) {
     newThreshold = 0.05;
   }
+  newThreshold = Number(newThreshold.toFixed(2));
 
   setComparisonSetting('threshold', newThreshold);
 
-  return ctx.reply(config.messages.increaseSensitivityMessage);
+  return ctx.reply(`${config.messages.increaseSensitivityMessage}
+${currentThreshold} ➡ ${newThreshold}`);
 });
 
 // actions
 bot.action(config.messages.reduceSensitivityAction, (ctx, next) => {
   const currentThreshold = getComparisonSetting('threshold');
-  let newThreshold = currentThreshold + THRESHOLD_CHANGE;
+
+  let newThreshold = currentThreshold - THRESHOLD_CHANGE;
   if (newThreshold > 0.95) {
     newThreshold = 0.95;
   }
+  newThreshold = Number(newThreshold.toFixed(2));
 
   setComparisonSetting('threshold', newThreshold);
 
   return ctx
     .reply(
       `${config.messages.reduceSensitivityMessage}
-🔍 ${currentThreshold} ➡ ${newThreshold}`
+${currentThreshold} ➡ ${newThreshold}`
     )
     .then(() => next());
 });

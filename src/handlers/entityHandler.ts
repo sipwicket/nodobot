@@ -1,20 +1,20 @@
-import { Context } from 'telegraf/typings'
-import { Update } from 'telegraf/typings/core/types/typegram'
-import { MatchedContext } from '../types'
+import { Context } from 'telegraf/typings';
+import { Update } from 'telegraf/typings/core/types/typegram';
+import { MatchedContext } from '../types';
 import {
   addToLinkCache,
   buildLinkCacheItem,
   getLinkCache,
-} from '../utils/index'
+} from '../utils/index';
 
-import config from '../../config.json'
+import config from '../../config.json';
 
 type ReplyToLinkEntityParams = {
-  ctx: MatchedContext<Context<Update>, 'text'>
-  author: string
-  date: number
-  messageId: number
-}
+  ctx: MatchedContext<Context<Update>, 'text'>;
+  author: string;
+  date: number;
+  messageId: number;
+};
 const replyToLinkEntity = ({
   ctx,
   author,
@@ -22,15 +22,15 @@ const replyToLinkEntity = ({
   messageId,
 }: ReplyToLinkEntityParams) => {
   // build date for message
-  const currentDate = new Date().getTime() / 1000
-  const timeDifference = currentDate - date
-  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1)
+  const currentDate = new Date().getTime() / 1000;
+  const timeDifference = currentDate - date;
+  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1);
 
   return ctx.reply(
     `${config.messages.foundLinkSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}`,
     { reply_to_message_id: messageId }
-  )
-}
+  );
+};
 
 export const entityMessageHandler = async (
   ctx: MatchedContext<Context<Update>, 'text'>
@@ -40,45 +40,45 @@ export const entityMessageHandler = async (
     from: { first_name: authorFirstName },
     message_id: messageId,
     entities,
-  } = ctx.message
+  } = ctx.message;
 
   if (!entities || entities.length === 0) {
-    return
+    return;
   }
 
   // check links for similarity, stop on the first cache hit
   entities.some(async (entity) => {
     if (entity.type !== 'url') {
-      return
+      return false;
     }
 
-    const { offset, length } = entity
-    const entityUrl = ctx.message.text.slice(offset, length)
+    const { offset, length } = entity;
+    const entityUrl = ctx.message.text.slice(offset, offset + length);
 
-    const linkCache = getLinkCache()
+    const linkCache = getLinkCache();
     const similarLink = linkCache.find(
       (cachedLink) => cachedLink.url === entityUrl
-    )
+    );
 
     if (!similarLink) {
       addToLinkCache(
         buildLinkCacheItem(entityUrl, messageDate, authorFirstName)
-      )
+      );
 
-      return false
+      return false;
     }
 
     const {
       metadata: { date, author },
-    } = similarLink
+    } = similarLink;
 
     await replyToLinkEntity({
       ctx,
       author: author,
       date: date,
       messageId: messageId,
-    })
+    });
 
-    return true
-  })
-}
+    return true;
+  });
+};
