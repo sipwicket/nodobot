@@ -7,6 +7,11 @@
     "foundImageSentBy": "Found a similar image! Posted by",
     "minutesAgo": "minutes ago.",
     "directReplyNoOp": "Functionality not implemented,",
-    "sendingRandomImage": "Here's a random image:"
+    "sendingRandomImage": "Here's a random image:",
+    "reduceSensitivityAction": "reduceSensitivityAction",
+    "reduceSensitivityBtn": "reduceSensitivityBtn",
+    "reduceSensitivityMessage": "reduceSensitivityMessage",
+    "increaseSensitivityCommand": "increaseSensitivityCommand",
+    "increaseSensitivityMessage": "increaseSensitivityMessage"
   }
 }

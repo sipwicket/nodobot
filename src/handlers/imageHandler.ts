@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { Markup } from 'telegraf';
 import { Context, Telegraf } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
 import {
@@ -70,6 +71,13 @@ const replyWithPhoto = ({
     {
       caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}`,
       reply_to_message_id: messageId,
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        Markup.button.callback(
+          config.messages.reduceSensitivityBtn,
+          config.messages.reduceSensitivityAction
+        ),
+      ]),
     }
   );
 };
