@@ -8,14 +8,14 @@ import {
   buildImageCacheItem,
   compareImages,
   downloadToBuffer,
+  getComparisonSetting,
   getImageCache,
+  getImageDimensions,
   resizeImage,
 } from '../utils/index';
 import { MatchedContext } from '../types';
 
 import config from '../../config.json';
-
-const MIN_MATCHED_PIXELS_THRESHOLD = 100;
 
 const downloadAndResizeImage = async (url: string) => {
   const imageBuffer = await downloadToBuffer(url);
@@ -28,13 +28,14 @@ const getImageSimilarity = (resizedImageObject: {
   info: sharp.OutputInfo;
 }): {
   index: number;
-  numOfPixels: number;
+  uniquePixels: number;
 } => {
   const imageCache = getImageCache();
+  const minNumberSimilarPixels = getComparisonSetting('similarNumPixels');
 
   const results = {
     index: -1,
-    numOfPixels: -1,
+    uniquePixels: -1,
   };
 
   imageCache.some((cachedImage, idx) => {
@@ -43,9 +44,9 @@ const getImageSimilarity = (resizedImageObject: {
       cachedImage.buffer
     );
 
-    if (comparison <= MIN_MATCHED_PIXELS_THRESHOLD) {
+    if (comparison <= minNumberSimilarPixels) {
       results.index = idx;
-      results.numOfPixels = comparison;
+      results.uniquePixels = comparison;
       return true;
     }
 
@@ -61,7 +62,7 @@ type ReplyWithPhotoParams = {
   author: string;
   date: number;
   messageId: number;
-  numOfPixels: number;
+  uniquePixels: number;
 };
 const replyWithPhoto = ({
   ctx,
@@ -69,12 +70,15 @@ const replyWithPhoto = ({
   author,
   date,
   messageId,
-  numOfPixels,
+  uniquePixels,
 }: ReplyWithPhotoParams) => {
   // build date for message
   const currentDate = new Date().getTime() / 1000;
   const timeDifference = currentDate - date;
   const timeDifferenceMinutes = (timeDifference / 60).toFixed(1);
+  const { x: sizeX, y: sizeY } = getImageDimensions();
+  const totalPixels = sizeX * sizeY;
+  const minNumberSimilarPixels = getComparisonSetting('similarNumPixels');
 
   return ctx.replyWithPhoto(
     {
@@ -82,7 +86,7 @@ const replyWithPhoto = ({
     },
     {
       caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.
-${config.messages.similarPixels} ${numOfPixels}/900. ${config.messages.similarityThreshold} ${MIN_MATCHED_PIXELS_THRESHOLD}.`,
+${config.messages.similarPixels} ${uniquePixels}/${totalPixels}. ${config.messages.similarityThreshold} ${minNumberSimilarPixels}.`,
       reply_to_message_id: messageId,
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
@@ -117,7 +121,7 @@ export const photoMessageHandler = async (
   }
 
   const resizedImageObject = await downloadAndResizeImage(fileLink.href);
-  const { index: similarImageIndex, numOfPixels } =
+  const { index: similarImageIndex, uniquePixels } =
     getImageSimilarity(resizedImageObject); // -1 if none found
 
   if (similarImageIndex === -1) {
@@ -142,6 +146,6 @@ export const photoMessageHandler = async (
     author: author,
     date: date,
     messageId: messageId,
-    numOfPixels,
+    uniquePixels,
   });
 };

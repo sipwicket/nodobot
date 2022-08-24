@@ -7,7 +7,13 @@ import {
 } from './src/handlers/index';
 
 import config from './config.json';
-import { getComparisonSetting, setComparisonSetting } from './src/utils';
+import {
+  clearImageCache,
+  getComparisonSetting,
+  getImageDimensions,
+  setComparisonSetting,
+  setResizeDimensions,
+} from './src/utils';
 
 const THRESHOLD_CHANGE = 0.05;
 
@@ -26,6 +32,15 @@ if (!config) {
 const bot = new Telegraf(process.env?.TELEGRAM_TOKEN);
 
 // commands
+bot.command('help', (ctx) => {
+  const strings = [
+    config.messages.setThresholdCommand,
+    config.messages.setResolutionCommand,
+    config.messages.increaseSensitivityCommand,
+  ].map((str) => `/${str}`);
+  return ctx.reply(strings.join('; '));
+});
+
 bot.command(config.messages.increaseSensitivityCommand, (ctx) => {
   const currentThreshold = getComparisonSetting('threshold');
 
@@ -39,6 +54,52 @@ bot.command(config.messages.increaseSensitivityCommand, (ctx) => {
 
   return ctx.reply(`${config.messages.increaseSensitivityMessage}
 ${currentThreshold} ➡ ${newThreshold}`);
+});
+bot.command(config.messages.setResolutionCommand, (ctx) => {
+  const [, resolution] = ctx.update.message.text.split(' ');
+
+  if (!resolution || isNaN(Number(resolution))) {
+    return ctx.reply(`${config.messages.invalidResolution}`);
+  }
+
+  const success = setResizeDimensions(Number(resolution));
+
+  if (success) {
+    clearImageCache();
+  } else {
+    return ctx.reply(`${config.messages.invalidResolution}`);
+  }
+
+  const totalPixels = Number(resolution) * Number(resolution);
+  const minimumNumSimilarPixels = Math.ceil(totalPixels / 10);
+  setComparisonSetting('similarNumPixels', Number(minimumNumSimilarPixels));
+
+  console.log(bot);
+
+  return ctx.reply(
+    `${config.messages.resolutionSetMessage} ${resolution}px. ${config.messages.thresholdSetMessage} ${minimumNumSimilarPixels}/${totalPixels}`
+  );
+});
+bot.command(config.messages.setThresholdCommand, (ctx) => {
+  const [, threshold] = ctx.update.message.text.split(' ');
+
+  if (!threshold || isNaN(Number(threshold))) {
+    return ctx.reply(`${config.messages.invalidThreshold}`);
+  }
+
+  const success = setComparisonSetting('similarNumPixels', Number(threshold));
+
+  if (!success) {
+    return ctx.reply(`${config.messages.invalidThreshold}`);
+  }
+
+  const { x: sizeX, y: sizeY } = getImageDimensions();
+  console.log({ x: sizeX, y: sizeY });
+  const totalPixels = sizeX * sizeY;
+
+  return ctx.reply(
+    `${config.messages.thresholdSetMessage} ${threshold}/${totalPixels}.`
+  );
 });
 
 // actions
