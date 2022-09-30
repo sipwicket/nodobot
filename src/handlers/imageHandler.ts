@@ -88,13 +88,7 @@ const replyWithPhoto = ({
       caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.
 ${config.messages.similarPixels} ${uniquePixels}/${totalPixels}. ${config.messages.similarityThreshold} ${minNumberSimilarPixels}.`,
       reply_to_message_id: messageId,
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard([
-        Markup.button.callback(
-          config.messages.reduceSensitivityBtn,
-          config.messages.reduceSensitivityAction
-        ),
-      ]),
+      parse_mode: 'Markdown'
     }
   );
 };
