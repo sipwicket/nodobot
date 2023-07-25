@@ -3,15 +3,23 @@
     "https://imagesapi.com/random" // returns { "url": "https://imagesapi.com/image.jpg" }
   ],
   "messages": {
-    "foundLinkSentBy": "Found an identical link! Posted by",
-    "foundImageSentBy": "Found a similar image! Posted by",
-    "minutesAgo": "minutes ago.",
     "directReplyNoOp": "Functionality not implemented,",
-    "sendingRandomImage": "Here's a random image:",
+    "foundImageSentBy": "Found a similar image! Posted by",
+    "foundLinkSentBy": "Found an identical link! Posted by",
+    "increaseSensitivityCommand": "increaseSensitivityCommand",
+    "increaseSensitivityMessage": "increaseSensitivityMessage",
+    "invalidResolution": "That's not a valid number!",
+    "invalidThreshold": "That's not a valid number!",
+    "minutesAgo": "minutes ago.",
     "reduceSensitivityAction": "reduceSensitivityAction",
     "reduceSensitivityBtn": "reduceSensitivityBtn",
     "reduceSensitivityMessage": "reduceSensitivityMessage",
-    "increaseSensitivityCommand": "increaseSensitivityCommand",
-    "increaseSensitivityMessage": "increaseSensitivityMessage"
+    "resolutionSetMessage": "Resolution set to",
+    "sendingRandomImage": "Here's a random image:",
+    "setResolutionCommand": "setResolutionCommand",
+    "setThresholdCommand": "setThresholdCommand",
+    "similarityThreshold": "Common pixels threshold:",
+    "similarPixels": "Pixels found in common:",
+    "thresholdSetMessage": "Similarity threshold set to"
   }
 }
