@@ -1,11 +1,13 @@
-import fetch from 'node-fetch'
-import config from '../../config.json'
+import fetch from 'node-fetch';
+import { config } from '../..';
 
 export const getRandomImage = async () => {
-  const endpointNumber = Math.floor(Math.random() * config.URL_ENDPOINTS.length)
-  const response = await fetch(config.URL_ENDPOINTS[endpointNumber])
+  const endpointNumber = Math.floor(
+    Math.random() * config.URL_ENDPOINTS.length
+  );
+  const response = await fetch(config.URL_ENDPOINTS[endpointNumber]);
 
-  const body = await response.json()
+  const body = await response.json();
 
-  return body?.url
-}
+  return body?.url;
+};

@@ -1,9 +1,8 @@
-import { Context, Telegraf } from 'telegraf/typings'
-import { Update } from 'telegraf/typings/core/types/typegram'
-import { MatchedContext } from '../types'
-import { getRandomImage } from '../utils'
-
-import config from '../../config.json'
+import { Context, Telegraf } from 'telegraf/typings';
+import { Update } from 'telegraf/typings/core/types/typegram';
+import { config } from '../..';
+import { MatchedContext } from '../types';
+import { getRandomImage } from '../utils';
 
 export const directMentionHandler = async (
   ctx: MatchedContext<Context<Update>, 'text'>,
@@ -11,14 +10,14 @@ export const directMentionHandler = async (
 ) => {
   if (bot.botInfo?.username) {
     if (ctx.message.text === `@${bot.botInfo?.username}`) {
-      const randomImageUrl = await getRandomImage()
+      const randomImageUrl = await getRandomImage();
 
       return ctx.reply(
         `${config.messages.sendingRandomImage} ${randomImageUrl}`,
         {
           reply_to_message_id: ctx.message.message_id,
         }
-      )
+      );
     }
   }
-}
+};

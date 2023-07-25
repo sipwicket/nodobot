@@ -1,7 +1,8 @@
 import sharp from 'sharp';
-import { Markup } from 'telegraf';
 import { Context, Telegraf } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
+import { config } from '../..';
+import { MatchedContext } from '../types';
 import {
   addToImageCache,
   bufferFromCachedImage,
@@ -13,9 +14,6 @@ import {
   getImageDimensions,
   resizeImage,
 } from '../utils/index';
-import { MatchedContext } from '../types';
-
-import config from '../../config.json';
 
 const downloadAndResizeImage = async (url: string) => {
   const imageBuffer = await downloadToBuffer(url);
@@ -88,7 +86,7 @@ const replyWithPhoto = ({
       caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.
 ${config.messages.similarPixels} ${uniquePixels}/${totalPixels}. ${config.messages.similarityThreshold} ${minNumberSimilarPixels}.`,
       reply_to_message_id: messageId,
-      parse_mode: 'Markdown'
+      parse_mode: 'Markdown',
     }
   );
 };

@@ -5,26 +5,23 @@ import {
   photoMessageHandler,
   replyHandler,
 } from './src/handlers/index';
-
-import config from './config.json';
 import {
+  Config,
   clearImageCache,
   getComparisonSetting,
   getImageDimensions,
+  loadConfig,
   setComparisonSetting,
   setResizeDimensions,
 } from './src/utils';
 
 const THRESHOLD_CHANGE = 0.05;
 
+export const config: Config = loadConfig(__dirname);
+
 // Quit on missing env var
 if (!process.env?.TELEGRAM_TOKEN) {
   console.error('Failed to get TELEGRAM_TOKEN from env.');
-  process.exit(1);
-}
-// Quit on missing messages json
-if (!config) {
-  console.error('Failed to get config.json in root folder');
   process.exit(1);
 }
 

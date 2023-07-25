@@ -2,7 +2,7 @@
   "name": "nodobot",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "start": "ts-node-dev --respawn --transpile-only index.ts",
     "lint": "eslint && tsc --noEmit"
