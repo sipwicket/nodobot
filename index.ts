@@ -137,6 +137,8 @@ bot.on('text', (ctx, next) => {
 });
 
 bot.on('photo', (ctx) => {
+  return;
+
   photoMessageHandler(ctx, bot);
 });
 
