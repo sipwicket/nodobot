@@ -5,3 +5,4 @@ export * from './getRandomImage';
 export * from './imageCache';
 export * from './linkCache';
 export * from './resizeImage';
+export * from './getYoutubeId';

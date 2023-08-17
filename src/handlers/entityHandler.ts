@@ -5,6 +5,7 @@ import {
   addToLinkCache,
   buildLinkCacheItem,
   getLinkCache,
+  getYoutubeId
 } from '../utils/index';
 
 import config from '../../config.json';
