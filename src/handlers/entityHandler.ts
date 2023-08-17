@@ -55,14 +55,17 @@ export const entityMessageHandler = async (
     const { offset, length } = entity;
     const entityUrl = ctx.message.text.slice(offset, offset + length);
 
+    const youtubeId = getYoutubeId(entityUrl);
+    const youtubeIdCacheKey = youtubeId ? `YOUTUBE-${youtubeId}` : null;
+
     const linkCache = getLinkCache();
     const similarLink = linkCache.find(
-      (cachedLink) => cachedLink.url === entityUrl
+      (cachedLink) => cachedLink.url === (youtubeIdCacheKey || entityUrl)
     );
 
     if (!similarLink) {
       addToLinkCache(
-        buildLinkCacheItem(entityUrl, messageDate, authorFirstName)
+        buildLinkCacheItem((youtubeIdCacheKey || entityUrl), messageDate, authorFirstName)
       );
 
       return false;
