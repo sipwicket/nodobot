@@ -3,8 +3,7 @@ import sharp from 'sharp';
 const MAX_CACHE_SIZE = 50;
 
 export type ImageCacheItem = {
-  buffer: Buffer;
-  info: sharp.OutputInfo;
+  hash: string;
   metadata: { date: number; author: string };
 };
 let imageCache: ImageCacheItem[] = [];
@@ -23,14 +22,10 @@ export const clearImageCache = () => {
 };
 
 export const buildImageCacheItem = (
-  resizedImageObject: {
-    data: Buffer;
-    info: sharp.OutputInfo;
-  },
+  hash: string,
   date: number,
   author: string
 ): ImageCacheItem => ({
-  buffer: resizedImageObject.data,
-  info: resizedImageObject.info,
+  hash,
   metadata: { date, author },
 });

@@ -1,50 +1,40 @@
-import sharp from 'sharp';
 import { Context, Telegraf } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
-import { config } from '../..';
-import { MatchedContext } from '../types';
+import { config } from '../../index.ts';
+import { MatchedContext } from '../types.ts';
 import {
   addToImageCache,
   bufferFromCachedImage,
   buildImageCacheItem,
-  compareImages,
   downloadToBuffer,
-  getComparisonSetting,
   getImageCache,
   getImageDimensions,
   resizeImage,
-} from '../utils/index';
+  generateHash,
+} from '../utils/index.ts';
 
-const downloadAndResizeImage = async (url: string) => {
+const downloadImageToHash = async (url: string) => {
   const imageBuffer = await downloadToBuffer(url);
 
-  return await resizeImage(imageBuffer);
+  return await generateHash(new Uint8Array(Buffer.from(imageBuffer)));
 };
 
-const getImageSimilarity = (resizedImageObject: {
-  data: Buffer;
-  info: sharp.OutputInfo;
-}): {
+const getImageSimilarity = (
+  hash: string
+): {
   index: number;
-  uniquePixels: number;
 } => {
   const imageCache = getImageCache();
-  const minNumberSimilarPixels = getComparisonSetting('similarNumPixels');
 
   const results = {
     index: -1,
-    uniquePixels: -1,
   };
 
   imageCache.some((cachedImage, idx) => {
-    const comparison = compareImages(
-      resizedImageObject.data,
-      cachedImage.buffer
-    );
+    const identicalHash = cachedImage.hash === hash;
 
-    if (comparison <= minNumberSimilarPixels) {
+    if (identicalHash) {
       results.index = idx;
-      results.uniquePixels = comparison;
       return true;
     }
 
@@ -56,39 +46,27 @@ const getImageSimilarity = (resizedImageObject: {
 
 type ReplyWithPhotoParams = {
   ctx: MatchedContext<Context<Update>, 'photo'>;
-  imageBuffer: Buffer;
   author: string;
   date: number;
   messageId: number;
-  uniquePixels: number;
 };
+
 const replyWithPhoto = ({
   ctx,
-  imageBuffer,
   author,
   date,
   messageId,
-  uniquePixels,
 }: ReplyWithPhotoParams) => {
   // build date for message
   const currentDate = new Date().getTime() / 1000;
   const timeDifference = currentDate - date;
   const timeDifferenceMinutes = (timeDifference / 60).toFixed(1);
-  const { x: sizeX, y: sizeY } = getImageDimensions();
-  const totalPixels = sizeX * sizeY;
-  const minNumberSimilarPixels = getComparisonSetting('similarNumPixels');
 
-  return ctx.replyWithPhoto(
-    {
-      source: imageBuffer,
-    },
-    {
-      caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.
-${config.messages.similarPixels} ${uniquePixels}/${totalPixels}. ${config.messages.similarityThreshold} ${minNumberSimilarPixels}.`,
-      reply_to_message_id: messageId,
-      parse_mode: 'Markdown',
-    }
-  );
+  return ctx.replyWithPhoto('https://i.imgur.com/dkM7RqX.png', {
+    caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.`,
+    reply_to_message_id: messageId,
+    parse_mode: 'Markdown',
+  });
 };
 
 export const photoMessageHandler = async (
@@ -112,13 +90,17 @@ export const photoMessageHandler = async (
     return;
   }
 
-  const resizedImageObject = await downloadAndResizeImage(fileLink.href);
-  const { index: similarImageIndex, uniquePixels } =
-    getImageSimilarity(resizedImageObject); // -1 if none found
+  const imageHash = await downloadImageToHash(fileLink.href);
+
+  if (!imageHash) {
+    return;
+  }
+
+  const { index: similarImageIndex } = getImageSimilarity(imageHash); // -1 if none found
 
   if (similarImageIndex === -1) {
     return addToImageCache(
-      buildImageCacheItem(resizedImageObject, messageDate, authorFirstName)
+      buildImageCacheItem(imageHash, messageDate, authorFirstName)
     );
   }
 
@@ -127,17 +109,10 @@ export const photoMessageHandler = async (
     metadata: { date, author },
   } = imageCache[similarImageIndex];
 
-  // send the thumbnail in the reply, build buffer from raw cached image
-  const cachedImageThumbnailBuffer = await bufferFromCachedImage(
-    imageCache[similarImageIndex]
-  );
-
   return await replyWithPhoto({
     ctx: ctx,
-    imageBuffer: cachedImageThumbnailBuffer,
     author: author,
     date: date,
     messageId: messageId,
-    uniquePixels,
   });
 };

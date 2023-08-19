@@ -1,5 +1,5 @@
 import fetch from 'node-fetch';
-import { config } from '../..';
+import { config } from '../../index.ts';
 
 export const getRandomImage = async () => {
   const endpointNumber = Math.floor(

@@ -1,8 +1,8 @@
 import { Context, Telegraf } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
-import { config } from '../..';
-import { MatchedContext } from '../types';
-import { getRandomImage } from '../utils';
+import { config } from '../../index.ts';
+import { MatchedContext } from '../types.ts';
+import { getRandomImage } from '../utils/index.ts';
 
 export const directMentionHandler = async (
   ctx: MatchedContext<Context<Update>, 'text'>,

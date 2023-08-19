@@ -5,10 +5,10 @@ import {
   addToLinkCache,
   buildLinkCacheItem,
   getLinkCache,
-  getYoutubeId
-} from '../utils/index';
+  getYoutubeId,
+} from '../utils/index.ts';
 
-import config from '../../config.json';
+import config from '../../config.json' assert { type: 'json' };
 
 type ReplyToLinkEntityParams = {
   ctx: MatchedContext<Context<Update>, 'text'>;
@@ -66,7 +66,11 @@ export const entityMessageHandler = async (
 
     if (!similarLink) {
       addToLinkCache(
-        buildLinkCacheItem((youtubeIdCacheKey || entityUrl), messageDate, authorFirstName)
+        buildLinkCacheItem(
+          youtubeIdCacheKey || entityUrl,
+          messageDate,
+          authorFirstName
+        )
       );
 
       return false;
