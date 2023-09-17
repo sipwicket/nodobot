@@ -59,6 +59,13 @@ function validateConfig(obj: unknown): obj is Config {
     console.error('URL_ENDPOINTS is not an array of strings');
     return false;
   }
+  if (
+    !Array.isArray(o.messages.noReplying) ||
+    !o.messages.noReplying.every((v) => typeof v === 'string')
+  ) {
+    console.error('URL_ENDPOINTS is not an array of strings');
+    return false;
+  }
 
   if (typeof o.messages !== 'object' || o.messages === null) {
     console.error('messages is not an object');
@@ -69,7 +76,6 @@ function validateConfig(obj: unknown): obj is Config {
   if (!c('foundImageSentBy')) return false;
   if (!c('minutesAgo')) return false;
   if (!c('directReplyNoOp')) return false;
-  if (!c('noReplying')) return false;
   if (!c('sendingRandomImage')) return false;
   if (!c('reduceSensitivityAction')) return false;
   if (!c('reduceSensitivityBtn')) return false;
