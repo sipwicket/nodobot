@@ -15,6 +15,8 @@ export interface Config {
     minutesAgo: string;
     /** Response when directly mentioned */
     directReplyNoOp: string;
+    /** Responses when directly mentioned */
+    noReplying: string[];
     /** Response when sending a random image */
     sendingRandomImage: string;
     /** ID for command to reduce sensitivity */
@@ -67,6 +69,7 @@ function validateConfig(obj: unknown): obj is Config {
   if (!c('foundImageSentBy')) return false;
   if (!c('minutesAgo')) return false;
   if (!c('directReplyNoOp')) return false;
+  if (!c('noReplying')) return false;
   if (!c('sendingRandomImage')) return false;
   if (!c('reduceSensitivityAction')) return false;
   if (!c('reduceSensitivityBtn')) return false;

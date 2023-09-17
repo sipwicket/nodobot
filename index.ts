@@ -40,8 +40,6 @@ bot.command('help', (ctx) => {
 
 // Set up handlers
 bot.on('text', (ctx, next) => {
-  console.log(ctx);
-
   if (ctx?.update?.message?.reply_to_message) {
     const replyUser = ctx?.update?.message?.reply_to_message?.from?.id;
     const botId = bot.botInfo?.id;
