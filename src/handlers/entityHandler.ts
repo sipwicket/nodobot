@@ -97,11 +97,15 @@ export const entityMessageHandler = async (
 
         const replyPrefix = `<b>${tgAuthor}</b> posted this dumb, broken, unfixed Twitter message:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`
 
-        ctx.reply(`${replyPrefix}${fixedUrl} \n\nDo better.`, {
-          parse_mode: 'HTML'
-        })
+        try {
+          ctx.reply(`${replyPrefix}${fixedUrl} \n\nDo better.`, {
+            parse_mode: 'HTML'
+          })
 
-        ctx.tg.deleteMessage(ctx.chat.id, ctx.message.message_id)
+          ctx.tg.deleteMessage(ctx.chat.id, ctx.message.message_id)
+        } catch (error) {
+          console.error('Done fucked up:', error);
+        }
       }
 
       return false;
