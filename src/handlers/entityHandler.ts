@@ -105,6 +105,8 @@ export const entityMessageHandler = async (
           ctx.tg.deleteMessage(ctx.chat.id, ctx.message.message_id)
         } catch (error) {
           console.error('Done fucked up:', error);
+
+          ctx.reply(`Sipchan done died: ${error}`)
         }
       }
 
