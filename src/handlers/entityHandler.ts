@@ -66,8 +66,6 @@ export const entityMessageHandler = async (
 
     const twitterId = getTwitterId(entityUrl);
 
-    console.log(' -> twitterId ', twitterId);
-
     const twitterIdCacheKey = twitterId ? `TWITTER-${twitterId}` : null;
 
     const linkCache = getLinkCache();
@@ -93,7 +91,17 @@ export const entityMessageHandler = async (
         }
         const fixedUrl = fixTwitterUrl(tweetAuthor, twitterId)
 
-        ctx.reply(`🐦🧰 ${fixedUrl}`)
+        const tgAuthor = ctx.message.from.first_name
+
+        const urlRemovedMessage = ctx.message.text.replace(entityUrl, '')
+
+        const replyPrefix = `<b>${tgAuthor}</b> posted this dumb, broken, unfixed Twitter message:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`
+
+        ctx.reply(`${replyPrefix}${fixedUrl} \n\nDo better.`, {
+          parse_mode: 'HTML'
+        })
+
+        ctx.tg.deleteMessage(ctx.chat.id, ctx.message.message_id)
       }
 
       return false;
