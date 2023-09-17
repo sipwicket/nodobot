@@ -4,11 +4,16 @@ import { MatchedContext } from '../types';
 import {
   addToLinkCache,
   buildLinkCacheItem,
+  fixTwitterUrl,
   getLinkCache,
+  getTwitterId,
+  getTwitterUser,
   getYoutubeId,
+  twitterUrlIsFixed,
 } from '../utils/index.ts';
 
 import config from '../../config.json' assert { type: 'json' };
+import { bot } from '../../index.ts';
 
 type ReplyToLinkEntityParams = {
   ctx: MatchedContext<Context<Update>, 'text'>;
@@ -59,19 +64,37 @@ export const entityMessageHandler = async (
     const youtubeId = getYoutubeId(entityUrl);
     const youtubeIdCacheKey = youtubeId ? `YOUTUBE-${youtubeId}` : null;
 
+    const twitterId = getTwitterId(entityUrl);
+
+    console.log(' -> twitterId ', twitterId);
+
+    const twitterIdCacheKey = twitterId ? `TWITTER-${twitterId}` : null;
+
     const linkCache = getLinkCache();
     const similarLink = linkCache.find(
-      (cachedLink) => cachedLink.url === (youtubeIdCacheKey || entityUrl)
+      (cachedLink) => cachedLink.url === (twitterIdCacheKey || youtubeIdCacheKey || entityUrl)
     );
 
     if (!similarLink) {
       addToLinkCache(
         buildLinkCacheItem(
-          youtubeIdCacheKey || entityUrl,
+          twitterIdCacheKey || youtubeIdCacheKey || entityUrl,
           messageDate,
           authorFirstName
         )
       );
+
+      // autofix twitter/x.com URLs
+      if (twitterId && !twitterUrlIsFixed(entityUrl)) {
+        const tweetAuthor = getTwitterUser(entityUrl)
+
+        if (!tweetAuthor) {
+          return
+        }
+        const fixedUrl = fixTwitterUrl(tweetAuthor, twitterId)
+
+        ctx.reply(`🐦🧰 ${fixedUrl}`)
+      }
 
       return false;
     }

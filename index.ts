@@ -7,10 +7,7 @@ import {
 } from './src/handlers/index.ts';
 import {
   Config,
-  clearImageCache,
-  getImageDimensions,
   loadConfig,
-  setResizeDimensions,
 } from './src/utils/index.ts';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -29,7 +26,7 @@ if (!process.env?.TELEGRAM_TOKEN) {
 }
 
 // Instantiate bot
-const bot = new Telegraf(process.env?.TELEGRAM_TOKEN);
+export const bot = new Telegraf(process.env?.TELEGRAM_TOKEN);
 
 // commands
 bot.command('help', (ctx) => {
