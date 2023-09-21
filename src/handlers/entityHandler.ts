@@ -95,10 +95,10 @@ export const entityMessageHandler = async (
 
         const urlRemovedMessage = ctx.message.text.replace(entityUrl, '')
 
-        const replyPrefix = `<b>${tgAuthor}</b> posted this dumb, broken, unfixed Twitter message:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`
+        const replyPrefix = `<b>${tgAuthor}</b> posted:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`
 
         try {
-          ctx.reply(`${replyPrefix}${fixedUrl} \n\nDo better.`, {
+          ctx.reply(`${replyPrefix}${fixedUrl}`, {
             parse_mode: 'HTML'
           })
 
