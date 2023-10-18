@@ -51,6 +51,11 @@ bot.on('photo', (ctx) => {
   photoMessageHandler(ctx, bot);
 });
 
+bot.catch((err, ctx) => {
+	ctx?.reply?.('sipchan died lol')
+  console.log(err)
+});
+
 // launch bot
 bot.launch();
 console.log('SIPCHAN ONLINE.');
