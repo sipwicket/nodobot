@@ -102,7 +102,7 @@ export const entityMessageHandler = async (
             parse_mode: 'HTML'
           })
 
-          ctx.tg.deleteMessage(ctx.chat.id, ctx.message.message_id)
+          ctx.deleteMessage(ctx.message.message_id)
         } catch (error) {
           console.error('Done fucked up:', error);
 
