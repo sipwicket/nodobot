@@ -2,6 +2,7 @@ import { Context, Telegraf } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
 import { config } from '../../index.ts';
 import { MatchedContext } from '../types.ts';
+import ago from 's-ago';
 import {
   addToImageCache,
   bufferFromCachedImage,
@@ -57,13 +58,8 @@ const replyWithPhoto = ({
   date,
   messageId,
 }: ReplyWithPhotoParams) => {
-  // build date for message
-  const currentDate = new Date().getTime() / 1000;
-  const timeDifference = currentDate - date;
-  const timeDifferenceMinutes = (timeDifference / 60).toFixed(1);
-
   return ctx.replyWithPhoto('https://i.imgur.com/dkM7RqX.png', {
-    caption: `${config.messages.foundImageSentBy} ${author}, ${timeDifferenceMinutes} ${config.messages.minutesAgo}.`,
+    caption: `${config.messages.foundImageSentBy} ${author}, ${ago(date)}.`,
     reply_to_message_id: messageId,
     parse_mode: 'Markdown',
   });
