@@ -58,8 +58,9 @@ const replyWithPhoto = ({
   date,
   messageId,
 }: ReplyWithPhotoParams) => {
+  const relativeTime = ago(new Date(date * 1000));
   return ctx.replyWithPhoto('https://i.imgur.com/dkM7RqX.png', {
-    caption: `${config.messages.foundImageSentBy} ${author}, ${ago(date)}.`,
+    caption: `${config.messages.foundImageSentBy} ${author}, ${relativeTime}.`,
     reply_to_message_id: messageId,
     parse_mode: 'Markdown',
   });
