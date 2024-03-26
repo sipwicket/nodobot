@@ -10,6 +10,9 @@ import {
   getTwitterUser,
   getYoutubeId,
   twitterUrlIsFixed,
+  getTiktokId,
+  getTiktokUser,
+  tiktokUrlIsFixed,
 } from '../utils/index.ts';
 
 import config from '../../config.json' assert { type: 'json' };
@@ -65,31 +68,37 @@ export const entityMessageHandler = async (
     const youtubeIdCacheKey = youtubeId ? `YOUTUBE-${youtubeId}` : null;
 
     const twitterId = getTwitterId(entityUrl);
-
     const twitterIdCacheKey = twitterId ? `TWITTER-${twitterId}` : null;
+
+    const tiktokId = getTiktokId(entityUrl);
+    const tiktokIdCacheKey = tiktokId ? `TIKTOK-${tiktokId}` : null;
 
     const linkCache = getLinkCache();
     const similarLink = linkCache.find(
-      (cachedLink) => cachedLink.url === (twitterIdCacheKey || youtubeIdCacheKey || entityUrl)
+      (cachedLink) => cachedLink.url === (twitterIdCacheKey || youtubeIdCacheKey || tiktokIdCacheKey || entityUrl)
     );
 
     if (!similarLink) {
       addToLinkCache(
         buildLinkCacheItem(
-          twitterIdCacheKey || youtubeIdCacheKey || entityUrl,
+          twitterIdCacheKey || youtubeIdCacheKey || tiktokIdCacheKey || entityUrl,
           messageDate,
           authorFirstName
         )
       );
 
-      // autofix twitter/x.com URLs
-      if (twitterId && !twitterUrlIsFixed(entityUrl)) {
+      // autofix twitter/x.com and tiktok.com URLs     
+      if ((twitterId && !twitterUrlIsFixed(entityUrl)) || (tiktokId && !tiktokUrlIsFixed(entityUrl))) {
         const tweetAuthor = getTwitterUser(entityUrl)
-
+        const tiktokAuthor = getTiktokUser(entityUrl)
+        
         if (!tweetAuthor) {
           return
+        } else if (!tiktokAuthor) {
+          return
         }
-        const fixedUrl = fixTwitterUrl(tweetAuthor, twitterId)
+        
+        const fixedUrl = twitterId ? fixTwitterUrl(tweetAuthor, twitterId) : fixTiktokUrl(tiktokAuthor, tiktokId);
 
         const tgAuthor = ctx.message.from.first_name
 
