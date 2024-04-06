@@ -26,7 +26,7 @@ export const tiktokUrlIsFixed = (url: string) => TIKTOK_FIXER_DOMAINS.some(
 );
 
 export const getTiktokUser = (url: string) => {
-  const twitterId =
+  const tiktokId =
     /\/(.\w+)(\/video\/)(\d+)/g.exec(
       url
     )?.[1];
@@ -34,4 +34,4 @@ export const getTiktokUser = (url: string) => {
   return tiktokId;
 };
 
-export const fixTwitterUrl = (username: string, tiktokvidId: string) => `https://${TIKTOK_FIXER_DOMAINS[0]}/${username}/video/${tiktokvidId}`
+export const fixTiktokUrl = (username: string, tiktokvidId: string) => `https://${TIKTOK_FIXER_DOMAINS[0]}/${username}/video/${tiktokvidId}`

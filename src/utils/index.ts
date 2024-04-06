@@ -6,4 +6,5 @@ export * from './linkCache.ts';
 export * from './resizeImage.ts';
 export * from './getYoutubeId.ts';
 export * from './getTwitterId.ts';
+export * from './getTiktokId.ts';
 export * from './generateHash.ts';
