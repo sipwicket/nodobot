@@ -90,7 +90,7 @@ export const entityMessageHandler = async (
 
       const tgAuthor = ctx.message.from.first_name;
       const urlRemovedMessage = ctx.message.text.replace(entityUrl, '');
-      const replyPrefix = `<b>${tgAuthor}</b> posted:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`;
+      const replyPrefix = `<b>${tgAuthor}</b> posted:\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`;
 
       // autofix twitter/x.com
       if ((twitterId && !twitterUrlIsFixed(entityUrl))) {
