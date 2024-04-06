@@ -13,6 +13,7 @@ import {
   getTiktokId,
   getTiktokUser,
   tiktokUrlIsFixed,
+  fixTiktokUrl,
 } from '../utils/index.ts';
 
 import config from '../../config.json' assert { type: 'json' };
@@ -87,34 +88,46 @@ export const entityMessageHandler = async (
         )
       );
 
-      // autofix twitter/x.com and tiktok.com URLs     
-      if ((twitterId && !twitterUrlIsFixed(entityUrl)) || (tiktokId && !tiktokUrlIsFixed(entityUrl))) {
-        const tweetAuthor = getTwitterUser(entityUrl)
-        const tiktokAuthor = getTiktokUser(entityUrl)
-        
-        if (!tweetAuthor) {
-          return
-        } else if (!tiktokAuthor) {
-          return
-        }
-        
-        const fixedUrl = twitterId ? fixTwitterUrl(tweetAuthor, twitterId) : fixTiktokUrl(tiktokAuthor, tiktokId);
+      const tgAuthor = ctx.message.from.first_name;
+      const urlRemovedMessage = ctx.message.text.replace(entityUrl, '');
+      const replyPrefix = `<b>${tgAuthor}</b> posted:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`;
 
-        const tgAuthor = ctx.message.from.first_name
+      // autofix twitter/x.com
+      if ((twitterId && !twitterUrlIsFixed(entityUrl))) {
 
-        const urlRemovedMessage = ctx.message.text.replace(entityUrl, '')
+        const tweetAuthor = getTwitterUser(entityUrl);
+        if (!tweetAuthor) return;
 
-        const replyPrefix = `<b>${tgAuthor}</b> posted:\n\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`
+        const fixedUrl = fixTwitterUrl(tweetAuthor, twitterId);
 
         try {
           ctx.reply(`${replyPrefix}${fixedUrl}`, {
             parse_mode: 'HTML'
-          })
+          });
 
-          ctx.deleteMessage(ctx.message.message_id)
+          ctx.deleteMessage(ctx.message.message_id);
         } catch (error) {
           console.error('Done fucked up:', error);
+          ctx.reply(`Sipchan done died: ${error}`)
+        }
+      }
 
+      // autofix tiktok.com URLs
+      if (tiktokId && !tiktokUrlIsFixed(entityUrl)) {
+
+        const tiktokAuthor = getTiktokUser(entityUrl)
+        if (!tiktokAuthor) return;
+        
+        const fixedUrl = fixTiktokUrl(tiktokAuthor, tiktokId);
+
+        try {
+          ctx.reply(`${replyPrefix}${fixedUrl}`, {
+            parse_mode: 'HTML'
+          });
+
+          ctx.deleteMessage(ctx.message.message_id);
+        } catch (error) {
+          console.error('Done fucked up:', error);
           ctx.reply(`Sipchan done died: ${error}`)
         }
       }
