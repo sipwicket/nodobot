@@ -1,7 +1,7 @@
 // regex is stateful :)
 export const TWITTER_FIXER_DOMAINS = [
-  'vxtwitter.com',
   'fxtwitter.com',
+  'vxtwitter.com',
 ]
 
 const TWITTER_DOMAINS = [
