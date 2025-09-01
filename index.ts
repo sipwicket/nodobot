@@ -5,10 +5,7 @@ import {
   photoMessageHandler,
   replyHandler,
 } from './src/handlers/index.ts';
-import {
-  Config,
-  loadConfig,
-} from './src/utils/index.ts';
+import { Config, loadConfig } from './src/utils/index.ts';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -40,9 +37,12 @@ bot.command('help', (ctx) => {
 
 // Set up handlers
 bot.on('text', (ctx, next) => {
-
-  entityMessageHandler(ctx);
-  directMentionHandler(ctx, bot);
+  try {
+    entityMessageHandler(ctx);
+    directMentionHandler(ctx, bot);
+  } catch (error) {
+    console.error('Error in bot.on(text):', error);
+  }
 
   next();
 });
@@ -52,8 +52,8 @@ bot.on('photo', (ctx) => {
 });
 
 bot.catch((err, ctx) => {
-	ctx?.reply?.('sipchan died lol')
-  console.log(err)
+  ctx?.reply?.('sipchan died lol');
+  console.log(err);
 });
 
 // launch bot

@@ -14,6 +14,8 @@ import {
   getYoutubeId,
   tiktokUrlIsFixed,
   twitterUrlIsFixed,
+  isExclusiveWebmUrl,
+  convertWebmToMp4WithCleanup,
 } from '../utils/index.ts';
 
 import { config } from '../../index.ts';
@@ -51,10 +53,60 @@ export const entityMessageHandler = async (
 ) => {
   const {
     date: messageDate,
+
     from: { first_name: authorFirstName },
     message_id: messageId,
     entities,
   } = ctx.message;
+
+  // Check if the message consists exclusively of a .webm URL
+  const webmUrl = isExclusiveWebmUrl(ctx.message.text);
+  if (webmUrl) {
+    let cleanup: (() => Promise<void>) | null = null;
+    try {
+      console.log('Detected exclusive .webm URL, converting to mp4...');
+      const result = await convertWebmToMp4WithCleanup(webmUrl);
+      cleanup = result.cleanup;
+
+      // Send the converted mp4 file
+      await ctx.replyWithVideo(
+        { source: result.buffer },
+        {
+          caption: `<b>${authorFirstName}</b> shared a video (converted from webm)`,
+          parse_mode: 'HTML',
+        }
+      );
+
+      // Delete the original message
+      await ctx.deleteMessage(messageId);
+
+      // Clean up temporary files after message is sent
+      await cleanup();
+      cleanup = null;
+
+      console.log('Successfully converted and sent .webm as mp4');
+      return;
+    } catch (error) {
+      console.error('Error converting webm to mp4:', error);
+
+      // Clean up temporary files on error if they exist
+      if (cleanup) {
+        await cleanup().catch((err) => {
+          console.error(
+            'Failed to cleanup temporary files after error:',
+            err.message
+          );
+        });
+      }
+
+      await ctx.reply(
+        `Failed to convert webm video: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+      return;
+    }
+  }
 
   if (!entities || entities.length === 0) {
     return;

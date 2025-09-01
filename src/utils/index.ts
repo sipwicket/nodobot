@@ -8,3 +8,5 @@ export * from './getYoutubeId.ts';
 export * from './getTwitterId.ts';
 export * from './getTiktokId.ts';
 export * from './generateHash.ts';
+export * from './detectWebm.ts';
+export * from './convertWebmToMp4.ts';
