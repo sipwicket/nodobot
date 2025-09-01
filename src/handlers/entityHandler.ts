@@ -16,8 +16,7 @@ import {
   fixTiktokUrl,
 } from '../utils/index.ts';
 
-import config from '../../config.json' assert { type: 'json' };
-import { bot } from '../../index.ts';
+import { config, bot } from '../../index.ts';
 
 type ReplyToLinkEntityParams = {
   ctx: MatchedContext<Context<Update>, 'text'>;
@@ -76,13 +75,21 @@ export const entityMessageHandler = async (
 
     const linkCache = getLinkCache();
     const similarLink = linkCache.find(
-      (cachedLink) => cachedLink.url === (twitterIdCacheKey || youtubeIdCacheKey || tiktokIdCacheKey || entityUrl)
+      (cachedLink) =>
+        cachedLink.url ===
+        (twitterIdCacheKey ||
+          youtubeIdCacheKey ||
+          tiktokIdCacheKey ||
+          entityUrl)
     );
 
     if (!similarLink) {
       addToLinkCache(
         buildLinkCacheItem(
-          twitterIdCacheKey || youtubeIdCacheKey || tiktokIdCacheKey || entityUrl,
+          twitterIdCacheKey ||
+            youtubeIdCacheKey ||
+            tiktokIdCacheKey ||
+            entityUrl,
           messageDate,
           authorFirstName
         )
@@ -90,11 +97,12 @@ export const entityMessageHandler = async (
 
       const tgAuthor = ctx.message.from.first_name;
       const urlRemovedMessage = ctx.message.text.replace(entityUrl, '');
-      const replyPrefix = `<b>${tgAuthor}</b> posted:\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''}`;
+      const replyPrefix = `<b>${tgAuthor}</b> posted:\n${
+        urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''
+      }`;
 
       // autofix twitter/x.com
-      if ((twitterId && !twitterUrlIsFixed(entityUrl))) {
-
+      if (twitterId && !twitterUrlIsFixed(entityUrl)) {
         const tweetAuthor = getTwitterUser(entityUrl);
         if (!tweetAuthor) return;
 
@@ -102,33 +110,32 @@ export const entityMessageHandler = async (
 
         try {
           ctx.reply(`${replyPrefix}${fixedUrl}`, {
-            parse_mode: 'HTML'
+            parse_mode: 'HTML',
           });
 
           ctx.deleteMessage(ctx.message.message_id);
         } catch (error) {
           console.error('Done fucked up:', error);
-          ctx.reply(`Sipchan done died: ${error}`)
+          ctx.reply(`Sipchan done died: ${error}`);
         }
       }
 
       // autofix tiktok.com URLs
       if (tiktokId && !tiktokUrlIsFixed(entityUrl)) {
-
-        const tiktokAuthor = getTiktokUser(entityUrl)
+        const tiktokAuthor = getTiktokUser(entityUrl);
         if (!tiktokAuthor) return;
-        
+
         const fixedUrl = fixTiktokUrl(tiktokAuthor, tiktokId);
 
         try {
           ctx.reply(`${replyPrefix}${fixedUrl}`, {
-            parse_mode: 'HTML'
+            parse_mode: 'HTML',
           });
 
           ctx.deleteMessage(ctx.message.message_id);
         } catch (error) {
           console.error('Done fucked up:', error);
-          ctx.reply(`Sipchan done died: ${error}`)
+          ctx.reply(`Sipchan done died: ${error}`);
         }
       }
 

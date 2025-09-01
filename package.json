@@ -22,8 +22,7 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.2.1",
     "prettier": "^2.7.1",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.7.1"
+    "ts-node-dev": "^2.0.0"
   },
   "dependencies": {
     "@types/pixelmatch": "^5.2.4",

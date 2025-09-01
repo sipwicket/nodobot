@@ -16,6 +16,7 @@
     "target": "ES2015",
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   }
 }
