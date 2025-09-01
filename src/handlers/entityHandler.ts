@@ -88,6 +88,7 @@ export const entityMessageHandler = async (
         (twitterIdCacheKey ||
           youtubeIdCacheKey ||
           tiktokIdCacheKey ||
+          instagramIdCacheKey ||
           entityUrl)
     );
 
@@ -97,6 +98,7 @@ export const entityMessageHandler = async (
           twitterIdCacheKey ||
             youtubeIdCacheKey ||
             tiktokIdCacheKey ||
+            instagramIdCacheKey ||
             entityUrl,
           messageDate,
           authorFirstName
