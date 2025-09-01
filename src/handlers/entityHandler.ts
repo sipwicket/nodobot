@@ -4,19 +4,24 @@ import { MatchedContext } from '../types';
 import {
   addToLinkCache,
   buildLinkCacheItem,
+  fixTiktokUrl,
   fixTwitterUrl,
   getLinkCache,
+  getTiktokId,
+  getTiktokUser,
   getTwitterId,
   getTwitterUser,
   getYoutubeId,
-  twitterUrlIsFixed,
-  getTiktokId,
-  getTiktokUser,
   tiktokUrlIsFixed,
-  fixTiktokUrl,
+  twitterUrlIsFixed,
 } from '../utils/index.ts';
 
-import { config, bot } from '../../index.ts';
+import { config } from '../../index.ts';
+import {
+  fixInstagramUrl,
+  getInstagramPathname,
+  instagramUrlIsFixed,
+} from '../utils/getInstagramId.ts';
 
 type ReplyToLinkEntityParams = {
   ctx: MatchedContext<Context<Update>, 'text'>;
@@ -73,6 +78,9 @@ export const entityMessageHandler = async (
     const tiktokId = getTiktokId(entityUrl);
     const tiktokIdCacheKey = tiktokId ? `TIKTOK-${tiktokId}` : null;
 
+    const instagramId = getInstagramPathname(entityUrl);
+    const instagramIdCacheKey = instagramId ? `INSTAGRAM-${instagramId}` : null;
+
     const linkCache = getLinkCache();
     const similarLink = linkCache.find(
       (cachedLink) =>
@@ -126,6 +134,22 @@ export const entityMessageHandler = async (
         if (!tiktokAuthor) return;
 
         const fixedUrl = fixTiktokUrl(tiktokAuthor, tiktokId);
+
+        try {
+          ctx.reply(`${replyPrefix}${fixedUrl}`, {
+            parse_mode: 'HTML',
+          });
+
+          ctx.deleteMessage(ctx.message.message_id);
+        } catch (error) {
+          console.error('Done fucked up:', error);
+          ctx.reply(`Sipchan done died: ${error}`);
+        }
+      }
+
+      // autofix instagram.com URLs
+      if (instagramId && !instagramUrlIsFixed(entityUrl)) {
+        const fixedUrl = fixInstagramUrl(instagramId);
 
         try {
           ctx.reply(`${replyPrefix}${fixedUrl}`, {
