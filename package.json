@@ -6,7 +6,7 @@
   "main": "index.ts",
   "scripts": {
     "prod": "npm run production",
-    "production": "tsx ./index.ts",
+    "production": "npx tsx ./index.ts",
     "start": "nodemon index.ts --watch \"src/**\"",
     "lint": "eslint && tsc --noEmit"
   },
