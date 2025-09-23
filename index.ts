@@ -1,9 +1,7 @@
 import { Telegraf } from 'telegraf';
 import {
-  directMentionHandler,
   entityMessageHandler,
   photoMessageHandler,
-  replyHandler,
 } from './src/handlers/index.ts';
 import { Config, loadConfig } from './src/utils/index.ts';
 import { fileURLToPath } from 'url';
@@ -39,7 +37,6 @@ bot.command('help', (ctx) => {
 bot.on('text', (ctx, next) => {
   try {
     entityMessageHandler(ctx);
-    directMentionHandler(ctx, bot);
   } catch (error) {
     console.error('Error in bot.on(text):', error);
   }
