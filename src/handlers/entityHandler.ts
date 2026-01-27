@@ -205,10 +205,11 @@ export const entityMessageHandler = async (
       // Download Instagram media
       if (instagramId && !instagramUrlIsFixed(entityUrl)) {
         try {
+          // Delete original message before processing
+          await ctx.deleteMessage(ctx.message.message_id);
+          
           // Try to download and send Instagram media
           await instagramMediaHandler(ctx, instagramId, entityUrl);
-          // If successful, delete original message
-          await ctx.deleteMessage(ctx.message.message_id);
         } catch (error) {
           // Log error to Telegram and fallback to URL fixing
           const errorMessage = error instanceof Error ? error.message : String(error);
@@ -240,8 +241,6 @@ export const entityMessageHandler = async (
             ctx.reply(`${replyPrefix}${fixedUrl}`, {
               parse_mode: 'HTML',
             });
-
-            ctx.deleteMessage(ctx.message.message_id);
           } catch (fallbackError) {
             console.error('Done fucked up:', fallbackError);
             ctx.reply(`Sipchan done died: ${fallbackError}`);
