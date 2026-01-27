@@ -8,7 +8,7 @@ export interface InstagramApiResult {
 // Rate limit tracking
 let lastRequestTime = 0;
 const MIN_REQUEST_DELAY = 2000; // 2 seconds between requests
-const RATE_LIMIT_RETRY_DELAYS = [1000, 2000, 5000]; // 1s, 2s, 5s
+const RATE_LIMIT_RETRY_DELAYS = [1000, 2000, 5000, 15000]; // 1s, 2s, 5s, 15s
 
 /**
  * Wait for minimum delay between requests
@@ -33,11 +33,13 @@ async function waitForRequestDelay(): Promise<void> {
  *
  * @param  {string}  shortcode - Instagram post/reel shortcode
  * @param  {string}  cookies - Optional session cookies for authentication
+ * @param  {(message: string) => Promise<void>}  statusCallback - Optional callback to report status updates
  * @return {Promise<InstagramApiResult>}
  */
 export async function getBlobMedia(
   shortcode: string,
-  cookies?: string
+  cookies?: string,
+  statusCallback?: (message: string) => Promise<void>
 ): Promise<InstagramApiResult> {
   if (!shortcode) {
     throw new Error('NOPATH: Shortcode is required');
@@ -69,33 +71,40 @@ export async function getBlobMedia(
     try {
       console.log(`[Instagram API] getBlobMedia attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length + 1} for shortcode: ${shortcode}`);
       const requestStartTime = Date.now();
-      
+
       const response = await fetch(url, { headers });
       const requestDuration = Date.now() - requestStartTime;
-      
+
       console.log(`[Instagram API] Response received in ${requestDuration}ms, status: ${response.status}, statusText: ${response.statusText}`);
-      
+
       const obj = await response.json();
-      
+
       // Log full response for debugging
       console.log(`[Instagram API] Response body for shortcode ${shortcode}:`, JSON.stringify(obj, null, 2));
 
       if (obj.status === 'fail') {
         console.warn(`[Instagram API] API returned fail status for shortcode ${shortcode}. Message: ${obj.message || 'No message'}, Feedback: ${obj.feedback_message || 'No feedback'}`);
-        
+
         // Check for rate limiting in primary request
         const isRateLimit =
           obj.message?.toLowerCase().includes('wait') ||
           obj.message?.toLowerCase().includes('rate limit') ||
           obj.message?.toLowerCase().includes('try again');
-        
+
         if (isRateLimit) {
           console.warn(`[Instagram API] Rate limit detected for shortcode ${shortcode}. Attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
-          
+
           if (attempt < RATE_LIMIT_RETRY_DELAYS.length) {
             // Retry after delay
             const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
+            const delaySeconds = delay / 1000;
             console.log(`[Instagram API] Waiting ${delay}ms before retry ${attempt + 2}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
+            
+            // Show status message for 15 second step
+            if (delay === 15000 && statusCallback) {
+              await statusCallback(`Rate limited. Waiting ${delaySeconds} seconds before retry...`);
+            }
+            
             await new Promise((resolve) => setTimeout(resolve, delay));
             continue; // Retry
           } else {
@@ -104,10 +113,10 @@ export async function getBlobMedia(
             throw new Error(errorMsg);
           }
         }
-        
+
         // Fallback to query_id method
         console.log(`[Instagram API] Falling back to query_id method for shortcode: ${shortcode}`);
-        const fallbackResult = await getBlobMediaWithQueryID(shortcode, cookies);
+        const fallbackResult = await getBlobMediaWithQueryID(shortcode, cookies, statusCallback);
         // Extract the nested data structure from query_id response
         const mediaData =
           fallbackResult?.xdt_api__v1__media__shortcode__web_info?.items?.[0] ||
@@ -121,18 +130,25 @@ export async function getBlobMedia(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.error(`[Instagram API] Error in getBlobMedia attempt ${attempt + 1} for shortcode ${shortcode}:`, lastError.message);
-      
+
       // Check if it's a rate limit error and we have retries left
       const isRateLimit = lastError.message.toLowerCase().includes('rate limit') ||
-                         lastError.message.toLowerCase().includes('wait');
-      
+        lastError.message.toLowerCase().includes('wait');
+
       if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
         const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
+        const delaySeconds = delay / 1000;
         console.log(`[Instagram API] Rate limit error detected, waiting ${delay}ms before retry ${attempt + 2}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
+        
+        // Show status message for 15 second step
+        if (delay === 15000 && statusCallback) {
+          await statusCallback(`Rate limited. Waiting ${delaySeconds} seconds before retry...`);
+        }
+        
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue; // Retry
       }
-      
+
       // If not rate limit or out of retries, throw
       if (attempt === RATE_LIMIT_RETRY_DELAYS.length || !isRateLimit) {
         console.error(`[Instagram API] Final error for shortcode ${shortcode} after ${attempt + 1} attempts:`, lastError.message);
@@ -140,7 +156,7 @@ export async function getBlobMedia(
       }
     }
   }
-  
+
   // Should never reach here, but just in case
   console.error(`[Instagram API] Unexpected end of retry loop for shortcode ${shortcode}`);
   throw lastError || new Error('Unknown error in getBlobMedia');
@@ -153,11 +169,13 @@ export async function getBlobMedia(
  *
  * @param  {string}  shortcode - Instagram post/reel shortcode
  * @param  {string}  cookies - Optional session cookies for authentication
+ * @param  {(message: string) => Promise<void>}  statusCallback - Optional callback to report status updates
  * @return {Promise<any>}
  */
 export async function getBlobMediaWithQueryID(
   shortcode: string,
-  cookies?: string
+  cookies?: string,
+  statusCallback?: (message: string) => Promise<void>
 ): Promise<any> {
   if (!shortcode) {
     throw new Error('NOPATH: Shortcode is required');
@@ -193,33 +211,40 @@ export async function getBlobMediaWithQueryID(
     try {
       console.log(`[Instagram API] getBlobMediaWithQueryID attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length + 1} for shortcode: ${shortcode}`);
       const requestStartTime = Date.now();
-      
+
       const response = await fetch(url, { headers });
       const requestDuration = Date.now() - requestStartTime;
-      
+
       console.log(`[Instagram API] QueryID response received in ${requestDuration}ms, status: ${response.status}, statusText: ${response.statusText}`);
-      
+
       const obj = await response.json();
-      
+
       // Log full response for debugging
       console.log(`[Instagram API] QueryID response body for shortcode ${shortcode}:`, JSON.stringify(obj, null, 2));
 
       if (obj.status === 'fail') {
         console.warn(`[Instagram API] QueryID API returned fail status for shortcode ${shortcode}. Message: ${obj.message || 'No message'}, Feedback: ${obj.feedback_message || 'No feedback'}`);
-        
+
         // Check for rate limiting
         const isRateLimit =
           obj.message?.toLowerCase().includes('wait') ||
           obj.message?.toLowerCase().includes('rate limit') ||
           obj.message?.toLowerCase().includes('try again');
-        
+
         if (isRateLimit) {
           console.warn(`[Instagram API] Rate limit detected in QueryID method for shortcode ${shortcode}. Attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
-          
+
           if (attempt < RATE_LIMIT_RETRY_DELAYS.length) {
             // Retry after delay
             const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
+            const delaySeconds = delay / 1000;
             console.log(`[Instagram API] Waiting ${delay}ms before QueryID retry ${attempt + 2}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
+            
+            // Show status message for 15 second step
+            if (delay === 15000 && statusCallback) {
+              await statusCallback(`Rate limited. Waiting ${delaySeconds} seconds before retry...`);
+            }
+            
             await new Promise((resolve) => setTimeout(resolve, delay));
             continue; // Retry
           } else {
@@ -228,7 +253,7 @@ export async function getBlobMediaWithQueryID(
             throw new Error(errorMsg);
           }
         }
-        
+
         const errorMsg = `getBlobMediaWithQueryID(): Request failed with API response: ${obj.message || 'Unknown error'}${obj.feedback_message ? `: ${obj.feedback_message}` : ''}`;
         console.error(`[Instagram API] QueryID method failed for shortcode ${shortcode}: ${errorMsg}`);
         throw new Error(errorMsg);
@@ -239,18 +264,25 @@ export async function getBlobMediaWithQueryID(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       console.error(`[Instagram API] Error in getBlobMediaWithQueryID attempt ${attempt + 1} for shortcode ${shortcode}:`, lastError.message);
-      
+
       // Check if it's a rate limit error and we have retries left
       const isRateLimit = lastError.message.toLowerCase().includes('rate limit') ||
-                         lastError.message.toLowerCase().includes('wait');
-      
+        lastError.message.toLowerCase().includes('wait');
+
       if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
         const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
+        const delaySeconds = delay / 1000;
         console.log(`[Instagram API] Rate limit error detected in QueryID, waiting ${delay}ms before retry ${attempt + 2}/${RATE_LIMIT_RETRY_DELAYS.length + 1}`);
+        
+        // Show status message for 15 second step
+        if (delay === 15000 && statusCallback) {
+          await statusCallback(`Rate limited. Waiting ${delaySeconds} seconds before retry...`);
+        }
+        
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue; // Retry
       }
-      
+
       // If not rate limit or out of retries, throw
       if (attempt === RATE_LIMIT_RETRY_DELAYS.length || !isRateLimit) {
         console.error(`[Instagram API] Final QueryID error for shortcode ${shortcode} after ${attempt + 1} attempts:`, lastError.message);
@@ -258,7 +290,7 @@ export async function getBlobMediaWithQueryID(
       }
     }
   }
-  
+
   // Should never reach here, but just in case
   console.error(`[Instagram API] Unexpected end of QueryID retry loop for shortcode ${shortcode}`);
   throw lastError || new Error('Unknown error in getBlobMediaWithQueryID');

@@ -47,7 +47,24 @@ export async function instagramMediaHandler(
     // Fetch media data from Instagram API
     console.log(`[Instagram Handler] Calling getBlobMedia for shortcode: ${shortcode}`);
     const apiStartTime = Date.now();
-    const result = await getBlobMedia(shortcode, cookies);
+    
+    // Create status callback to update progress message
+    const statusCallback = async (message: string) => {
+      if (progressMessage) {
+        try {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            progressMessage.message_id,
+            undefined,
+            `${message}\n${generateProgressBar(0, 1)}`
+          );
+        } catch (error) {
+          console.error('Failed to update status message:', error);
+        }
+      }
+    };
+    
+    const result = await getBlobMedia(shortcode, cookies, statusCallback);
     const apiDuration = Date.now() - apiStartTime;
     console.log(`[Instagram Handler] getBlobMedia completed in ${apiDuration}ms, result type: ${result.type}`);
 
