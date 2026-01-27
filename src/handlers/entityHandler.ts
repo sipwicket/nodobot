@@ -24,6 +24,7 @@ import {
   getInstagramPathname,
   instagramUrlIsFixed,
 } from '../utils/getInstagramId.ts';
+import { instagramMediaHandler } from './instagramHandler.ts';
 
 type ReplyToLinkEntityParams = {
   ctx: MatchedContext<Context<Update>, 'text'>;
@@ -201,19 +202,28 @@ export const entityMessageHandler = async (
         }
       }
 
-      // autofix instagram.com URLs
+      // Download Instagram media
       if (instagramId && !instagramUrlIsFixed(entityUrl)) {
-        const fixedUrl = fixInstagramUrl(instagramId);
-
         try {
-          ctx.reply(`${replyPrefix}${fixedUrl}`, {
-            parse_mode: 'HTML',
-          });
-
-          ctx.deleteMessage(ctx.message.message_id);
+          // Try to download and send Instagram media
+          await instagramMediaHandler(ctx, instagramId, entityUrl);
+          // If successful, delete original message
+          await ctx.deleteMessage(ctx.message.message_id);
         } catch (error) {
-          console.error('Done fucked up:', error);
-          ctx.reply(`Sipchan done died: ${error}`);
+          // Fallback to URL fixing if download fails
+          console.error('Instagram download failed, falling back to URL fix:', error);
+          const fixedUrl = fixInstagramUrl(instagramId);
+
+          try {
+            ctx.reply(`${replyPrefix}${fixedUrl}`, {
+              parse_mode: 'HTML',
+            });
+
+            ctx.deleteMessage(ctx.message.message_id);
+          } catch (fallbackError) {
+            console.error('Done fucked up:', fallbackError);
+            ctx.reply(`Sipchan done died: ${fallbackError}`);
+          }
         }
       }
 
