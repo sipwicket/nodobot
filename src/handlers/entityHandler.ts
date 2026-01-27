@@ -209,7 +209,7 @@ export const entityMessageHandler = async (
           await ctx.deleteMessage(ctx.message.message_id);
           
           // Try to download and send Instagram media
-          await instagramMediaHandler(ctx, instagramId, entityUrl);
+          await instagramMediaHandler(ctx, instagramId, entityUrl, authorFirstName);
         } catch (error) {
           // Log error to Telegram and fallback to URL fixing
           const errorMessage = error instanceof Error ? error.message : String(error);
@@ -222,12 +222,12 @@ export const entityMessageHandler = async (
           try {
             if (isRateLimit) {
               await ctx.reply(
-                `⏳ Instagram rate limit reached. Please wait a few minutes before trying again.\n\nFalling back to link replacement...`,
+                `Instagram rate limit reached. Please wait a few minutes before trying again.\n\nFalling back to link replacement...`,
                 { parse_mode: 'HTML' }
               );
             } else {
               await ctx.reply(
-                `❌ Failed to download Instagram media:\n<code>${errorMessage}</code>\n\nFalling back to link replacement...`,
+                `Failed to download Instagram media:\n<code>${errorMessage}</code>\n\nFalling back to link replacement...`,
                 { parse_mode: 'HTML' }
               );
             }

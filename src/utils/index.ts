@@ -14,3 +14,4 @@ export * from './convertWebmToMp4.ts';
 export * from './instagramApi.ts';
 export * from './instagramMedia.ts';
 export * from './logger.ts';
+export * from './progressBar.ts';
