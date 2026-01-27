@@ -1,7 +1,7 @@
 import { Context } from 'telegraf/typings';
 import { Update } from 'telegraf/typings/core/types/typegram';
 import { MatchedContext } from '../types';
-import { downloadToBuffer } from '../utils/downloadToBuffer.ts';
+import { downloadToFile } from '../utils/downloadToBuffer.ts';
 import { getBlobMedia } from '../utils/instagramApi.ts';
 import { extractMediaUrls } from '../utils/instagramMedia.ts';
 import { extractShortcode } from '../utils/getInstagramId.ts';
@@ -88,135 +88,159 @@ export async function instagramMediaHandler(
       );
     }
 
-    // Download all media items to buffers
-    const mediaBuffers: Array<{ buffer: Buffer; type: 'video' | 'image' }> = [];
-    for (let i = 0; i < mediaItems.length; i++) {
-      const item = mediaItems[i];
-      try {
-        // Update progress for each item
-        if (progressMessage) {
-          await ctx.telegram.editMessageText(
-            ctx.chat.id,
-            progressMessage.message_id,
-            undefined,
-            `Downloading ${i + 1}/${mediaItems.length}...\n${generateProgressBar(i + 1, mediaItems.length)}`
-          );
+    // Download all media items to temporary files
+    const mediaFiles: Array<{ filePath: string; type: 'video' | 'image'; cleanup: () => Promise<void> }> = [];
+    const cleanupFunctions: Array<() => Promise<void>> = [];
+    
+    try {
+      for (let i = 0; i < mediaItems.length; i++) {
+        const item = mediaItems[i];
+        try {
+          // Update progress for each item
+          if (progressMessage) {
+            await ctx.telegram.editMessageText(
+              ctx.chat.id,
+              progressMessage.message_id,
+              undefined,
+              `Downloading ${i + 1}/${mediaItems.length}...\n${generateProgressBar(i + 1, mediaItems.length)}`
+            );
+          }
+          
+          // Determine file extension based on type
+          const extension = item.type === 'video' ? 'mp4' : 'jpg';
+          const result = await downloadToFile(item.url, extension);
+          mediaFiles.push({ filePath: result.filePath, type: item.type, cleanup: result.cleanup });
+          cleanupFunctions.push(result.cleanup);
+        } catch (error) {
+          console.error(`Error downloading media item ${item.index}:`, error);
+          // Continue with other items even if one fails
         }
-        
-        const buffer = await downloadToBuffer(item.url);
-        mediaBuffers.push({ buffer, type: item.type });
-      } catch (error) {
-        console.error(`Error downloading media item ${item.index}:`, error);
-        // Continue with other items even if one fails
       }
-    }
 
-    if (mediaBuffers.length === 0) {
-      throw new Error('Failed to download any media items');
-    }
+      if (mediaFiles.length === 0) {
+        throw new Error('Failed to download any media items');
+      }
 
-    // Update progress message
-    if (progressMessage) {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        progressMessage.message_id,
-        undefined,
-        `Sending to Telegram...\n${generateProgressBar(mediaBuffers.length, mediaBuffers.length)}`
-      );
-    }
-
-    // Telegram media groups have a limit of 10 items
-    const MAX_MEDIA_GROUP_SIZE = 10;
-    const mediaGroups: Array<Array<{ buffer: Buffer; type: 'video' | 'image' }>> = [];
-
-    // Split into groups of 10 if needed
-    for (let i = 0; i < mediaBuffers.length; i += MAX_MEDIA_GROUP_SIZE) {
-      mediaGroups.push(mediaBuffers.slice(i, i + MAX_MEDIA_GROUP_SIZE));
-    }
-
-    // Send each media group
-    for (let groupIndex = 0; groupIndex < mediaGroups.length; groupIndex++) {
-      // Update progress for each group
+      // Update progress message
       if (progressMessage) {
         await ctx.telegram.editMessageText(
           ctx.chat.id,
           progressMessage.message_id,
           undefined,
-          `Sending group ${groupIndex + 1}/${mediaGroups.length}...\n${generateProgressBar(groupIndex + 1, mediaGroups.length)}`
+          `Sending to Telegram...\n${generateProgressBar(mediaFiles.length, mediaFiles.length)}`
         );
       }
-      const group = mediaGroups[groupIndex];
-      // Calculate how many items have been sent so far (including this group)
-      const itemsSentSoFar = groupIndex * MAX_MEDIA_GROUP_SIZE + group.length;
-      const mediaGroup = group.map((item, index) => {
-        const isFirstInGroup = index === 0;
-        const isFirstGroup = groupIndex === 0;
-        const globalIndex = groupIndex * MAX_MEDIA_GROUP_SIZE + index + 1;
 
-        if (item.type === 'video') {
-          const caption = isFirstInGroup
-            ? isFirstGroup
-              ? mediaItems.length > 1
-                ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
-                : `<b>${author}</b> posted:\nInstagram video`
-              : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
-            : undefined;
-          
-          return {
-            type: 'video' as const,
-            media: { source: item.buffer },
-            ...(caption && { caption, parse_mode: 'HTML' }),
-          };
-        } else {
-          const caption = isFirstInGroup
-            ? isFirstGroup
-              ? mediaItems.length > 1
-                ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
-                : `<b>${author}</b> posted:\nInstagram photo`
-              : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
-            : undefined;
-          
-          return {
-            type: 'photo' as const,
-            media: { source: item.buffer },
-            ...(caption && { caption, parse_mode: 'HTML' }),
-          };
-        }
-      });
+      // Telegram media groups have a limit of 10 items
+      const MAX_MEDIA_GROUP_SIZE = 10;
+      const mediaGroups: Array<Array<{ filePath: string; type: 'video' | 'image' }>> = [];
 
-      try {
-        await ctx.replyWithMediaGroup(mediaGroup);
-        // Small delay between groups to avoid rate limiting
-        if (groupIndex < mediaGroups.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
+      // Split into groups of 10 if needed
+      for (let i = 0; i < mediaFiles.length; i += MAX_MEDIA_GROUP_SIZE) {
+        mediaGroups.push(mediaFiles.slice(i, i + MAX_MEDIA_GROUP_SIZE).map(({ filePath, type }) => ({ filePath, type })));
+      }
+
+      // Send each media group
+      for (let groupIndex = 0; groupIndex < mediaGroups.length; groupIndex++) {
+        // Update progress for each group
+        if (progressMessage) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            progressMessage.message_id,
+            undefined,
+            `Sending group ${groupIndex + 1}/${mediaGroups.length}...\n${generateProgressBar(groupIndex + 1, mediaGroups.length)}`
+          );
         }
-      } catch (error) {
-        console.error(`Error sending media group ${groupIndex + 1}:`, error);
-        // Fallback: send items individually if media group fails
-        for (const item of group) {
-          try {
-            if (item.type === 'video') {
-              await ctx.replyWithVideo(
-                { source: item.buffer },
-                {
-                  caption: `<b>${author}</b> posted:\nInstagram video`,
-                  parse_mode: 'HTML',
-                }
-              );
-            } else {
-              await ctx.replyWithPhoto(
-                { source: item.buffer },
-                {
-                  caption: `<b>${author}</b> posted:\nInstagram photo`,
-                  parse_mode: 'HTML',
-                }
-              );
+        const group = mediaGroups[groupIndex];
+        // Calculate how many items have been sent so far (including this group)
+        const itemsSentSoFar = groupIndex * MAX_MEDIA_GROUP_SIZE + group.length;
+        const mediaGroup = group.map((item, index) => {
+          const isFirstInGroup = index === 0;
+          const isFirstGroup = groupIndex === 0;
+          const globalIndex = groupIndex * MAX_MEDIA_GROUP_SIZE + index + 1;
+
+          if (item.type === 'video') {
+            const caption = isFirstInGroup
+              ? isFirstGroup
+                ? mediaItems.length > 1
+                  ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
+                  : `<b>${author}</b> posted:\nInstagram video`
+                : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
+              : undefined;
+            
+            return {
+              type: 'video' as const,
+              media: { source: item.filePath },
+              ...(caption && { caption, parse_mode: 'HTML' }),
+            };
+          } else {
+            const caption = isFirstInGroup
+              ? isFirstGroup
+                ? mediaItems.length > 1
+                  ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
+                  : `<b>${author}</b> posted:\nInstagram photo`
+                : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
+              : undefined;
+            
+            return {
+              type: 'photo' as const,
+              media: { source: item.filePath },
+              ...(caption && { caption, parse_mode: 'HTML' }),
+            };
+          }
+        });
+
+        try {
+          await ctx.replyWithMediaGroup(mediaGroup);
+          // Small delay between groups to avoid rate limiting
+          if (groupIndex < mediaGroups.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          console.error(`Error sending media group ${groupIndex + 1}:`, error);
+          // Fallback: send items individually if media group fails
+          for (const item of group) {
+            try {
+              if (item.type === 'video') {
+                await ctx.replyWithVideo(
+                  { source: item.filePath },
+                  {
+                    caption: `<b>${author}</b> posted:\nInstagram video`,
+                    parse_mode: 'HTML',
+                  }
+                );
+              } else {
+                await ctx.replyWithPhoto(
+                  { source: item.filePath },
+                  {
+                    caption: `<b>${author}</b> posted:\nInstagram photo`,
+                    parse_mode: 'HTML',
+                  }
+                );
+              }
+            } catch (fallbackError) {
+              console.error('Error in fallback send:', fallbackError);
             }
-          } catch (fallbackError) {
-            console.error('Error in fallback send:', fallbackError);
           }
         }
       }
+
+      // Clean up all temporary files after messages are sent
+      console.log(`Cleaning up ${cleanupFunctions.length} temporary file(s)...`);
+      for (const cleanup of cleanupFunctions) {
+        await cleanup().catch((err) => {
+          console.error('Failed to cleanup temporary file:', err);
+        });
+      }
+    } catch (downloadError) {
+      // Clean up any files that were downloaded before the error
+      console.log(`Cleaning up ${cleanupFunctions.length} temporary file(s) after download error...`);
+      for (const cleanup of cleanupFunctions) {
+        await cleanup().catch((err) => {
+          console.error('Failed to cleanup temporary file:', err);
+        });
+      }
+      throw downloadError;
     }
 
     // Delete progress message when done
