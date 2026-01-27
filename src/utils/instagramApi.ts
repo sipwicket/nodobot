@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { logger } from './logger';
 
 export interface InstagramApiResult {
   type: 'query_hash' | 'query_id';
@@ -8,7 +9,7 @@ export interface InstagramApiResult {
 // Rate limit tracking
 let lastRequestTime = 0;
 const MIN_REQUEST_DELAY = 2000; // 2 seconds between requests
-const RATE_LIMIT_RETRY_DELAYS = [30000, 60000, 120000]; // 30s, 60s, 120s
+const RATE_LIMIT_RETRY_DELAYS = [1000, 2000, 5000]; // 1s, 2s, 5s
 
 /**
  * Wait for minimum delay between requests
@@ -39,6 +40,8 @@ export async function getBlobMedia(
   if (!shortcode) {
     throw new Error('NOPATH: Shortcode is required');
   }
+
+  logger.log(`Fetching Instagram media for shortcode: ${shortcode}`);
 
   const queryHash = '2c4c2e343a8f64c625ba02b2aa12c7f8';
   const variables = encodeURIComponent(
@@ -75,26 +78,28 @@ export async function getBlobMedia(
         if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
           // Retry after delay
           const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
-          console.log(`Rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
+          logger.warn(`Instagram rate limited for shortcode ${shortcode}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue; // Retry
         }
         
         if (isRateLimit) {
           const errorMsg = `Instagram rate limit: ${obj.message || 'Please wait a few minutes before trying again'}`;
-          console.error(errorMsg);
+          logger.error(`Instagram rate limit exceeded for shortcode ${shortcode}:`, errorMsg);
           throw new Error(errorMsg);
         }
         
         // Fallback to query_id method
-        console.log('Request failed, trying fallback method:', shortcode);
+        logger.log(`Primary Instagram API request failed for shortcode ${shortcode}, trying fallback method...`);
         const fallbackResult = await getBlobMediaWithQueryID(shortcode, cookies);
         // Extract the nested data structure from query_id response
         const mediaData =
           fallbackResult?.xdt_api__v1__media__shortcode__web_info?.items?.[0] ||
           fallbackResult;
+        logger.log(`Successfully fetched Instagram media for shortcode: ${shortcode} (query_id fallback method)`);
         return { type: 'query_id', data: mediaData };
       } else {
+        logger.log(`Successfully fetched Instagram media for shortcode: ${shortcode} (query_hash method)`);
         return { type: 'query_hash', data: obj.data };
       }
     } catch (err) {
@@ -106,14 +111,14 @@ export async function getBlobMedia(
       
       if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
         const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
-        console.log(`Rate limited, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
+        logger.warn(`Instagram rate limited (catch block) for shortcode ${shortcode}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue; // Retry
       }
       
       // If not rate limit or out of retries, throw
       if (attempt === RATE_LIMIT_RETRY_DELAYS.length || !isRateLimit) {
-        console.error('getBlobMedia() error:', lastError);
+        logger.error(`getBlobMedia() error for shortcode ${shortcode}:`, lastError);
         throw lastError;
       }
     }
@@ -179,21 +184,22 @@ export async function getBlobMediaWithQueryID(
         if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
           // Retry after delay
           const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
-          console.log(`Rate limited (fallback), retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
+          logger.warn(`Instagram rate limited (fallback method) for shortcode ${shortcode}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue; // Retry
         }
         
         if (isRateLimit) {
           const errorMsg = `Instagram rate limit: ${obj.message || 'Please wait a few minutes before trying again'}`;
-          console.error(errorMsg);
+          logger.error(`Instagram rate limit exceeded (fallback) for shortcode ${shortcode}:`, errorMsg);
           throw new Error(errorMsg);
         }
         
         const errorMsg = `getBlobMediaWithQueryID(): Request failed with API response: ${obj.message || 'Unknown error'}${obj.feedback_message ? `: ${obj.feedback_message}` : ''}`;
-        console.error(errorMsg);
+        logger.error(`getBlobMediaWithQueryID() error for shortcode ${shortcode}:`, errorMsg);
         throw new Error(errorMsg);
       } else {
+        logger.log(`Successfully fetched Instagram media for shortcode: ${shortcode} (query_id method)`);
         return obj.data;
       }
     } catch (err) {
@@ -205,14 +211,14 @@ export async function getBlobMediaWithQueryID(
       
       if (isRateLimit && attempt < RATE_LIMIT_RETRY_DELAYS.length) {
         const delay = RATE_LIMIT_RETRY_DELAYS[attempt];
-        console.log(`Rate limited (fallback), retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
+        logger.warn(`Instagram rate limited (fallback catch block) for shortcode ${shortcode}, retrying in ${delay / 1000}s (attempt ${attempt + 1}/${RATE_LIMIT_RETRY_DELAYS.length})...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue; // Retry
       }
       
       // If not rate limit or out of retries, throw
       if (attempt === RATE_LIMIT_RETRY_DELAYS.length || !isRateLimit) {
-        console.error('getBlobMediaWithQueryID() error:', lastError);
+        logger.error(`getBlobMediaWithQueryID() error for shortcode ${shortcode}:`, lastError);
         throw lastError;
       }
     }

@@ -4,6 +4,7 @@ import {
   photoMessageHandler,
 } from './src/handlers/index.ts';
 import { Config, loadConfig } from './src/utils/index.ts';
+import { clearLogFile, logger } from './src/utils/logger.ts';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -12,11 +13,15 @@ const __dirname = dirname(__filename);
 
 const THRESHOLD_CHANGE = 0.05;
 
+// Clear log file on server start
+clearLogFile();
+logger.log('Log file cleared on server start');
+
 export const config: Config = loadConfig(__dirname);
 
 // Quit on missing env var
 if (!process.env?.TELEGRAM_TOKEN) {
-  console.error('Failed to get TELEGRAM_TOKEN from env.');
+  logger.error('Failed to get TELEGRAM_TOKEN from env.');
   process.exit(1);
 }
 
@@ -38,7 +43,7 @@ bot.on('text', (ctx, next) => {
   try {
     entityMessageHandler(ctx);
   } catch (error) {
-    console.error('Error in bot.on(text):', error);
+    logger.error('Error in bot.on(text):', error);
   }
 
   next();
@@ -50,12 +55,12 @@ bot.on('photo', (ctx) => {
 
 bot.catch((err, ctx) => {
   ctx?.reply?.('sipchan died lol');
-  console.log(err);
+  logger.error('Bot error:', err);
 });
 
 // launch bot
 bot.launch();
-console.log('SIPCHAN ONLINE.');
+logger.log('SIPCHAN ONLINE.');
 
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));

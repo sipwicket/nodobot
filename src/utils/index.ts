@@ -13,3 +13,4 @@ export * from './detectWebm.ts';
 export * from './convertWebmToMp4.ts';
 export * from './instagramApi.ts';
 export * from './instagramMedia.ts';
+export * from './logger.ts';
