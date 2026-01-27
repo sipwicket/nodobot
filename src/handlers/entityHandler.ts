@@ -214,11 +214,22 @@ export const entityMessageHandler = async (
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error('Instagram download failed, falling back to URL fix:', error);
           
+          // Check if it's a rate limit error
+          const isRateLimit = errorMessage.toLowerCase().includes('rate limit') || 
+                             errorMessage.toLowerCase().includes('wait');
+          
           try {
-            await ctx.reply(
-              `❌ Failed to download Instagram media:\n<code>${errorMessage}</code>\n\nFalling back to link replacement...`,
-              { parse_mode: 'HTML' }
-            );
+            if (isRateLimit) {
+              await ctx.reply(
+                `⏳ Instagram rate limit reached. Please wait a few minutes before trying again.\n\nFalling back to link replacement...`,
+                { parse_mode: 'HTML' }
+              );
+            } else {
+              await ctx.reply(
+                `❌ Failed to download Instagram media:\n<code>${errorMessage}</code>\n\nFalling back to link replacement...`,
+                { parse_mode: 'HTML' }
+              );
+            }
           } catch (replyError) {
             console.error('Failed to send error message:', replyError);
           }

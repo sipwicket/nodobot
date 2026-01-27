@@ -42,6 +42,18 @@ export async function getBlobMedia(
     const obj = await response.json();
 
     if (obj.status === 'fail') {
+      // Check for rate limiting in primary request
+      const isRateLimit =
+        obj.message?.toLowerCase().includes('wait') ||
+        obj.message?.toLowerCase().includes('rate limit') ||
+        obj.message?.toLowerCase().includes('try again');
+      
+      if (isRateLimit) {
+        const errorMsg = `Instagram rate limit: ${obj.message || 'Please wait a few minutes before trying again'}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
       // Fallback to query_id method
       console.log('Request failed, trying fallback method:', shortcode);
       const fallbackResult = await getBlobMediaWithQueryID(shortcode, cookies);
@@ -100,7 +112,19 @@ export async function getBlobMediaWithQueryID(
     const obj = await response.json();
 
     if (obj.status === 'fail') {
-      const errorMsg = `getBlobMediaWithQueryID(): Request failed with API response: ${obj.message}: ${obj.feedback_message}`;
+      // Check for rate limiting
+      const isRateLimit =
+        obj.message?.toLowerCase().includes('wait') ||
+        obj.message?.toLowerCase().includes('rate limit') ||
+        obj.message?.toLowerCase().includes('try again');
+      
+      if (isRateLimit) {
+        const errorMsg = `Instagram rate limit: ${obj.message || 'Please wait a few minutes before trying again'}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      const errorMsg = `getBlobMediaWithQueryID(): Request failed with API response: ${obj.message || 'Unknown error'}${obj.feedback_message ? `: ${obj.feedback_message}` : ''}`;
       console.error(errorMsg);
       throw new Error(errorMsg);
     } else {
