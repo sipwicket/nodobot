@@ -20,12 +20,17 @@ export async function instagramMediaHandler(
   pathname: string,
   originalUrl: string
 ): Promise<void> {
+  let progressMessage: any = null;
+  
   try {
     // Extract shortcode from pathname
     const shortcode = extractShortcode(pathname);
     if (!shortcode) {
       throw new Error('Invalid Instagram URL: Could not extract shortcode');
     }
+
+    // Send initial progress message
+    progressMessage = await ctx.reply('📥 Fetching Instagram media...');
 
     // Get cookies from environment variable
     const cookies = process.env.INSTAGRAM_COOKIES;
@@ -40,10 +45,31 @@ export async function instagramMediaHandler(
       throw new Error('No media found in Instagram post/reel');
     }
 
+    // Update progress message
+    if (progressMessage) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessage.message_id,
+        undefined,
+        `📥 Downloading ${mediaItems.length} media item${mediaItems.length > 1 ? 's' : ''}...`
+      );
+    }
+
     // Download all media items to buffers
     const mediaBuffers: Array<{ buffer: Buffer; type: 'video' | 'image' }> = [];
-    for (const item of mediaItems) {
+    for (let i = 0; i < mediaItems.length; i++) {
+      const item = mediaItems[i];
       try {
+        // Update progress for each item
+        if (progressMessage && mediaItems.length > 1) {
+          await ctx.telegram.editMessageText(
+            ctx.chat.id,
+            progressMessage.message_id,
+            undefined,
+            `📥 Downloading ${i + 1}/${mediaItems.length}...`
+          );
+        }
+        
         const buffer = await downloadToBuffer(item.url);
         mediaBuffers.push({ buffer, type: item.type });
       } catch (error) {
@@ -54,6 +80,16 @@ export async function instagramMediaHandler(
 
     if (mediaBuffers.length === 0) {
       throw new Error('Failed to download any media items');
+    }
+
+    // Update progress message
+    if (progressMessage) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessage.message_id,
+        undefined,
+        `📤 Sending to Telegram...`
+      );
     }
 
     // Telegram media groups have a limit of 10 items
@@ -67,6 +103,15 @@ export async function instagramMediaHandler(
 
     // Send each media group
     for (let groupIndex = 0; groupIndex < mediaGroups.length; groupIndex++) {
+      // Update progress for each group
+      if (progressMessage && mediaGroups.length > 1) {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          progressMessage.message_id,
+          undefined,
+          `📤 Sending group ${groupIndex + 1}/${mediaGroups.length}...`
+        );
+      }
       const group = mediaGroups[groupIndex];
       const mediaGroup = group.map((item, index) => {
         const isFirstInGroup = index === 0;
@@ -120,7 +165,25 @@ export async function instagramMediaHandler(
         }
       }
     }
+
+    // Delete progress message when done
+    if (progressMessage) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, progressMessage.message_id);
+      } catch (error) {
+        console.error('Failed to delete progress message:', error);
+        // Non-critical error, continue
+      }
+    }
   } catch (error) {
+    // Delete progress message on error
+    if (progressMessage) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, progressMessage.message_id);
+      } catch (deleteError) {
+        console.error('Failed to delete progress message:', deleteError);
+      }
+    }
     console.error('Instagram media handler error:', error);
     throw error; // Re-throw to let caller handle fallback
   }
