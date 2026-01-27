@@ -7,6 +7,108 @@ import { extractMediaUrls } from '../utils/instagramMedia.ts';
 import { extractShortcode } from '../utils/getInstagramId.ts';
 import { generateProgressBar } from '../utils/progressBar.ts';
 
+type GroupItem = {
+  filePath: string;
+  type: 'video' | 'image';
+  cleanup: () => Promise<void>;
+};
+
+/**
+ * sendMediaGroupWithRetry
+ * @description Send a media group with retry logic to ensure items are always grouped.
+ * 
+ * @param  {MatchedContext}  ctx - Telegram context
+ * @param  {GroupItem[]}  currentGroup - Items to send as a group
+ * @param  {number}  totalItems - Total number of items in the Instagram post
+ * @param  {string}  author - Name of the original message sender
+ * @param  {number}  itemsSent - Number of items already sent
+ * @return {Promise<number>} Number of items sent in this group
+ */
+async function sendMediaGroupWithRetry(
+  ctx: MatchedContext<Context<Update>, 'text'>,
+  currentGroup: GroupItem[],
+  totalItems: number,
+  author: string,
+  itemsSent: number
+): Promise<number> {
+  if (currentGroup.length === 0) {
+    return 0;
+  }
+
+  const isFirstGroup = itemsSent === 0;
+  const itemsSentSoFar = itemsSent + currentGroup.length;
+
+  const mediaGroup = currentGroup.map((groupItem, index) => {
+    const isFirstInGroup = index === 0;
+
+    if (groupItem.type === 'video') {
+      const caption = isFirstInGroup
+        ? isFirstGroup
+          ? totalItems > 1
+            ? `<b>${author}</b> posted:\nInstagram media (${totalItems} items)`
+            : `<b>${author}</b> posted:\nInstagram video`
+          : `<b>${author}</b> posted:\nInstagram media (${totalItems} items) - ${itemsSentSoFar}/${totalItems}`
+        : undefined;
+
+      return {
+        type: 'video' as const,
+        media: { source: groupItem.filePath },
+        ...(caption && { caption, parse_mode: 'HTML' }),
+      };
+    } else {
+      const caption = isFirstInGroup
+        ? isFirstGroup
+          ? totalItems > 1
+            ? `<b>${author}</b> posted:\nInstagram media (${totalItems} items)`
+            : `<b>${author}</b> posted:\nInstagram photo`
+          : `<b>${author}</b> posted:\nInstagram media (${totalItems} items) - ${itemsSentSoFar}/${totalItems}`
+        : undefined;
+
+      return {
+        type: 'photo' as const,
+        media: { source: groupItem.filePath },
+        ...(caption && { caption, parse_mode: 'HTML' }),
+      };
+    }
+  });
+
+  // Retry logic to ensure media groups are always sent as groups
+  const MAX_RETRIES = 3;
+  let retryCount = 0;
+
+  while (retryCount < MAX_RETRIES) {
+    try {
+      await ctx.replyWithMediaGroup(mediaGroup);
+      
+      // Clean up files immediately after sending (memory-efficient)
+      for (const groupItem of currentGroup) {
+        await groupItem.cleanup().catch((err) => {
+          console.error('Failed to cleanup temporary file:', err);
+        });
+      }
+
+      return currentGroup.length;
+    } catch (error) {
+      retryCount++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Error sending media group (attempt ${retryCount}/${MAX_RETRIES}):`, errorMessage);
+
+      if (retryCount < MAX_RETRIES) {
+        // Wait before retrying (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+        console.log(`Retrying media group send after ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        // All retries failed - throw error to maintain grouping requirement
+        console.error(`Failed to send media group after ${MAX_RETRIES} attempts`);
+        throw new Error(`Failed to send media group after ${MAX_RETRIES} attempts: ${errorMessage}`);
+      }
+    }
+  }
+
+  return 0; // Should never reach here, but TypeScript needs it
+}
+
 /**
  * instagramMediaHandler
  * @description Download and send Instagram media (posts/reels) to Telegram.
@@ -91,7 +193,7 @@ export async function instagramMediaHandler(
     // Process media items one at a time to minimize memory usage
     // This is critical for low-RAM environments (<512MB)
     const MAX_MEDIA_GROUP_SIZE = 10;
-    let currentGroup: Array<{ filePath: string; type: 'video' | 'image'; cleanup: () => Promise<void> }> = [];
+    let currentGroup: GroupItem[] = [];
     let itemsProcessed = 0;
     let itemsSent = 0;
     
@@ -130,95 +232,21 @@ export async function instagramMediaHandler(
               );
             }
 
-            const isFirstGroup = itemsSent === 0;
-            const itemsSentSoFar = itemsSent + currentGroup.length;
-            
-            const mediaGroup = currentGroup.map((groupItem, index) => {
-              const isFirstInGroup = index === 0;
-              const globalIndex = itemsSent + index + 1;
+            // Send group with retry logic (ensures items are always grouped)
+            const sentCount = await sendMediaGroupWithRetry(
+              ctx,
+              currentGroup,
+              mediaItems.length,
+              author,
+              itemsSent
+            );
+            itemsSent += sentCount;
 
-              if (groupItem.type === 'video') {
-                const caption = isFirstInGroup
-                  ? isFirstGroup
-                    ? mediaItems.length > 1
-                      ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
-                      : `<b>${author}</b> posted:\nInstagram video`
-                    : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
-                  : undefined;
-                
-                return {
-                  type: 'video' as const,
-                  media: { source: groupItem.filePath },
-                  ...(caption && { caption, parse_mode: 'HTML' }),
-                };
-              } else {
-                const caption = isFirstInGroup
-                  ? isFirstGroup
-                    ? mediaItems.length > 1
-                      ? `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items)`
-                      : `<b>${author}</b> posted:\nInstagram photo`
-                    : `<b>${author}</b> posted:\nInstagram media (${mediaItems.length} items) - ${itemsSentSoFar}/${mediaItems.length}`
-                  : undefined;
-                
-                return {
-                  type: 'photo' as const,
-                  media: { source: groupItem.filePath },
-                  ...(caption && { caption, parse_mode: 'HTML' }),
-                };
-              }
-            });
-
-            try {
-              await ctx.replyWithMediaGroup(mediaGroup);
-              itemsSent += currentGroup.length;
-              
-              // Clean up files immediately after sending (memory-efficient)
-              for (const groupItem of currentGroup) {
-                await groupItem.cleanup().catch((err) => {
-                  console.error('Failed to cleanup temporary file:', err);
-                });
-              }
-              
-              // Small delay between groups to avoid rate limiting
-              if (i < mediaItems.length - 1) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-              }
-            } catch (error) {
-              console.error(`Error sending media group:`, error);
-              // Fallback: send items individually if media group fails
-              for (const groupItem of currentGroup) {
-                try {
-                  if (groupItem.type === 'video') {
-                    await ctx.replyWithVideo(
-                      { source: groupItem.filePath },
-                      {
-                        caption: `<b>${author}</b> posted:\nInstagram video`,
-                        parse_mode: 'HTML',
-                      }
-                    );
-                  } else {
-                    await ctx.replyWithPhoto(
-                      { source: groupItem.filePath },
-                      {
-                        caption: `<b>${author}</b> posted:\nInstagram photo`,
-                        parse_mode: 'HTML',
-                      }
-                    );
-                  }
-                  itemsSent++;
-                  
-                  // Clean up immediately after sending
-                  await groupItem.cleanup().catch((err) => {
-                    console.error('Failed to cleanup temporary file:', err);
-                  });
-                } catch (fallbackError) {
-                  console.error('Error in fallback send:', fallbackError);
-                  // Still try to cleanup on error
-                  await groupItem.cleanup().catch(() => {});
-                }
-              }
+            // Small delay between groups to avoid rate limiting
+            if (i < mediaItems.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 500));
             }
-            
+
             // Clear the group after sending and cleanup
             currentGroup = [];
           }
@@ -229,7 +257,34 @@ export async function instagramMediaHandler(
             await downloadedFile.cleanup().catch(() => {});
           }
           // Continue with other items even if one fails
+          // If we're at the last item and have items in currentGroup, send them
+          if (i === mediaItems.length - 1 && currentGroup.length > 0) {
+            // Send remaining items as a group (ensures items are always grouped)
+            const sentCount = await sendMediaGroupWithRetry(
+              ctx,
+              currentGroup,
+              mediaItems.length,
+              author,
+              itemsSent
+            );
+            itemsSent += sentCount;
+            currentGroup = [];
+          }
         }
+      }
+
+      // Send any remaining items in currentGroup (edge case: if loop ended with items still pending)
+      if (currentGroup.length > 0) {
+        // Send remaining items as a group (ensures items are always grouped)
+        const sentCount = await sendMediaGroupWithRetry(
+          ctx,
+          currentGroup,
+          mediaItems.length,
+          author,
+          itemsSent
+        );
+        itemsSent += sentCount;
+        currentGroup = [];
       }
 
       if (itemsSent === 0) {
