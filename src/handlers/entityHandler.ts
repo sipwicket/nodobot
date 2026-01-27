@@ -101,8 +101,7 @@ export const entityMessageHandler = async (
       }
 
       await ctx.reply(
-        `Failed to convert webm video: ${
-          error instanceof Error ? error.message : 'Unknown error'
+        `Failed to convert webm video: ${error instanceof Error ? error.message : 'Unknown error'
         }`
       );
       return;
@@ -149,10 +148,10 @@ export const entityMessageHandler = async (
       addToLinkCache(
         buildLinkCacheItem(
           twitterIdCacheKey ||
-            youtubeIdCacheKey ||
-            tiktokIdCacheKey ||
-            instagramIdCacheKey ||
-            entityUrl,
+          youtubeIdCacheKey ||
+          tiktokIdCacheKey ||
+          instagramIdCacheKey ||
+          entityUrl,
           messageDate,
           authorFirstName
         )
@@ -160,9 +159,8 @@ export const entityMessageHandler = async (
 
       const tgAuthor = ctx.message.from.first_name;
       const urlRemovedMessage = ctx.message.text.replace(entityUrl, '');
-      const replyPrefix = `<b>${tgAuthor}</b> posted:\n${
-        urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''
-      }`;
+      const replyPrefix = `<b>${tgAuthor}</b> posted:\n${urlRemovedMessage?.length > 0 ? `<pre>${urlRemovedMessage}</pre>` : ''
+        }`;
 
       // autofix twitter/x.com
       if (twitterId && !twitterUrlIsFixed(entityUrl)) {
@@ -207,18 +205,18 @@ export const entityMessageHandler = async (
         try {
           // Delete original message before processing
           await ctx.deleteMessage(ctx.message.message_id);
-          
+
           // Try to download and send Instagram media
           await instagramMediaHandler(ctx, instagramId, entityUrl, authorFirstName);
         } catch (error) {
           // Log error to Telegram and fallback to URL fixing
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error('Instagram download failed, falling back to URL fix:', error);
-          
+
           // Check if it's a rate limit error
-          const isRateLimit = errorMessage.toLowerCase().includes('rate limit') || 
-                             errorMessage.toLowerCase().includes('wait');
-          
+          const isRateLimit = errorMessage.toLowerCase().includes('rate limit') ||
+            errorMessage.toLowerCase().includes('wait');
+
           try {
             if (isRateLimit) {
               await ctx.reply(
