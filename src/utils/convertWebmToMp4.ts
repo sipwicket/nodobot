@@ -1,8 +1,10 @@
 import fetch from 'node-fetch';
 import ffmpeg from 'fluent-ffmpeg';
 import { promises as fs } from 'fs';
+import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { pipeline } from 'stream/promises';
 
 /**
  * Internal helper to create ffmpeg command with optimized settings
@@ -57,6 +59,7 @@ export interface ConversionResult {
 
 /**
  * Internal helper for downloading webm and setting up file paths
+ * Uses streaming to minimize memory usage
  */
 async function setupWebmDownload(webmUrl: string): Promise<{
   inputPath: string;
@@ -68,15 +71,25 @@ async function setupWebmDownload(webmUrl: string): Promise<{
   const inputPath = join(tempDir, `input_${timestamp}.webm`);
   const outputPath = join(tempDir, `output_${timestamp}.mp4`);
 
-  // Download the webm file
+  // Download the webm file using streaming (memory-efficient)
   console.log('Downloading webm file...');
   const response = await fetch(webmUrl);
   if (!response.ok) {
     throw new Error(`Failed to download webm file: ${response.statusText}`);
   }
 
-  const webmBuffer = await response.buffer();
-  await fs.writeFile(inputPath, webmBuffer);
+  // Stream directly to file instead of buffering in memory
+  const { createWriteStream } = await import('fs');
+  const { pipeline } = await import('stream/promises');
+  const writeStream = createWriteStream(inputPath);
+  
+  try {
+    await pipeline(response.body as NodeJS.ReadableStream, writeStream);
+  } catch (error) {
+    // Clean up partial file on error
+    await fs.unlink(inputPath).catch(() => {});
+    throw error;
+  }
 
   // Create cleanup function
   const cleanup = async (): Promise<void> => {
@@ -104,15 +117,22 @@ export async function convertWebmToMp4(webmUrl: string): Promise<Buffer> {
   const outputPath = join(tempDir, `output_${timestamp}.mp4`);
 
   try {
-    // Download the webm file
+    // Download the webm file using streaming (memory-efficient)
     console.log('Downloading webm file...');
     const response = await fetch(webmUrl);
     if (!response.ok) {
       throw new Error(`Failed to download webm file: ${response.statusText}`);
     }
 
-    const webmBuffer = await response.buffer();
-    await fs.writeFile(inputPath, webmBuffer);
+    // Stream directly to file instead of buffering in memory
+    const writeStream = createWriteStream(inputPath);
+    try {
+      await pipeline(response.body as NodeJS.ReadableStream, writeStream);
+    } catch (error) {
+      // Clean up partial file on error
+      await fs.unlink(inputPath).catch(() => {});
+      throw error;
+    }
 
     // Convert to mp4 with fastest possible settings
     console.log('Converting webm to mp4...');
@@ -177,15 +197,22 @@ export async function convertWebmToMp4UltraFast(
   const outputPath = join(tempDir, `output_${timestamp}.mp4`);
 
   try {
-    // Download the webm file
+    // Download the webm file using streaming (memory-efficient)
     console.log('Downloading webm file...');
     const response = await fetch(webmUrl);
     if (!response.ok) {
       throw new Error(`Failed to download webm file: ${response.statusText}`);
     }
 
-    const webmBuffer = await response.buffer();
-    await fs.writeFile(inputPath, webmBuffer);
+    // Stream directly to file instead of buffering in memory
+    const writeStream = createWriteStream(inputPath);
+    try {
+      await pipeline(response.body as NodeJS.ReadableStream, writeStream);
+    } catch (error) {
+      // Clean up partial file on error
+      await fs.unlink(inputPath).catch(() => {});
+      throw error;
+    }
 
     // Convert to mp4 with ultra-fast settings - copy audio if compatible
     console.log('Converting webm to mp4 (ultra-fast mode)...');

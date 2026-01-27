@@ -79,8 +79,8 @@ export async function getBlobMedia(
 
       const obj = await response.json();
 
-      // Log full response for debugging
-      console.log(`[Instagram API] Response body for shortcode ${shortcode}:`, JSON.stringify(obj, null, 2));
+      // Log response summary (not full body to save memory)
+      console.log(`[Instagram API] Response received for shortcode ${shortcode}, status: ${obj.status || 'ok'}, has data: ${!!obj.data}`);
 
       if (obj.status === 'fail') {
         console.warn(`[Instagram API] API returned fail status for shortcode ${shortcode}. Message: ${obj.message || 'No message'}, Feedback: ${obj.feedback_message || 'No feedback'}`);
@@ -219,8 +219,8 @@ export async function getBlobMediaWithQueryID(
 
       const obj = await response.json();
 
-      // Log full response for debugging
-      console.log(`[Instagram API] QueryID response body for shortcode ${shortcode}:`, JSON.stringify(obj, null, 2));
+      // Log response summary (not full body to save memory)
+      console.log(`[Instagram API] QueryID response received for shortcode ${shortcode}, status: ${obj.status || 'ok'}, has data: ${!!obj.data}`);
 
       if (obj.status === 'fail') {
         console.warn(`[Instagram API] QueryID API returned fail status for shortcode ${shortcode}. Message: ${obj.message || 'No message'}, Feedback: ${obj.feedback_message || 'No feedback'}`);

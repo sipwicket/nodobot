@@ -1,7 +1,9 @@
 import fetch from 'node-fetch'
 import { promises as fs } from 'fs'
+import { createWriteStream } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
+import { pipeline } from 'stream/promises'
 
 export async function downloadToBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url)
@@ -17,7 +19,7 @@ export interface DownloadToFileResult {
 }
 
 /**
- * Downloads a file from URL to a temporary file on disk
+ * Downloads a file from URL to a temporary file on disk using streaming (memory-efficient)
  * @param url - The URL to download from
  * @param extension - Optional file extension (e.g., 'jpg', 'mp4'). If not provided, will try to infer from URL or Content-Type
  * @returns Promise with file path and cleanup function
@@ -61,9 +63,16 @@ export async function downloadToFile(
   const randomId = Math.random().toString(36).substring(2, 9)
   const filePath = join(tempDir, `instagram_${timestamp}_${randomId}.${fileExt}`)
 
-  // Download to file
-  const buffer = await response.buffer()
-  await fs.writeFile(filePath, buffer as Uint8Array)
+  // Stream download directly to file (memory-efficient for large files)
+  const writeStream = createWriteStream(filePath)
+  try {
+    // Use pipeline for proper error handling and cleanup
+    await pipeline(response.body as NodeJS.ReadableStream, writeStream)
+  } catch (error) {
+    // Clean up partial file on error
+    await fs.unlink(filePath).catch(() => {})
+    throw error
+  }
 
   // Create cleanup function
   const cleanup = async (): Promise<void> => {
