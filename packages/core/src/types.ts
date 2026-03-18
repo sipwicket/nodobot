@@ -1,0 +1,2 @@
+export type TenantId = string;
+

@@ -1,0 +1,13 @@
+{
+  "123456789": {
+    "schemaVersion": 1,
+    "featureFlags": {
+      "duplicateLinks": true,
+      "instagramDownload": false
+    },
+    "subscription": {
+      "inactiveMessage": "Please subscribe to use this bot in this group."
+    }
+  }
+}
+

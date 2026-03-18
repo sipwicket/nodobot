@@ -1,0 +1,5 @@
+{
+  "name": "@nodobot/bot",
+  "exports": "./src/main.ts"
+}
+

@@ -1,0 +1,5 @@
+{
+  "name": "@nodobot/integrations",
+  "exports": "./src/mod.ts"
+}
+

@@ -1,0 +1,22 @@
+{
+  "workspace": [
+    "apps/bot",
+    "packages/core",
+    "packages/integrations",
+    "packages/shared",
+    "tests"
+  ],
+  "tasks": {
+    "dev": "deno run -A --watch=apps/bot,packages apps/bot/src/main.ts",
+    "start": "deno run -A apps/bot/src/main.ts",
+    "check": "deno check apps/bot/src/main.ts",
+    "test": "deno test -A",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "imports": {
+    "@core/": "./packages/core/src/",
+    "@integrations/": "./packages/integrations/src/",
+    "@shared/": "./packages/shared/src/"
+  }
+}
