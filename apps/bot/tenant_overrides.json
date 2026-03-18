@@ -1,0 +1,14 @@
+{
+  "33119994": {
+    "featureFlags": {
+      "directReply": true,
+      "webmConversion": true,
+      "instagramDownload": true
+    }
+  },
+  "-1001049765134": {
+    "featureFlags": {
+      "directReply": false
+    }
+  }
+}

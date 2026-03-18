@@ -7,7 +7,7 @@
     "tests"
   ],
   "tasks": {
-    "dev": "deno run -A --watch=apps/bot,packages apps/bot/src/main.ts",
+    "dev": "deno run -A --watch=apps/bot/src,packages --watch-exclude=apps/bot/tenant_overrides.json --watch-exclude='**/tenant_overrides.json' apps/bot/src/main.ts",
     "start": "deno run -A apps/bot/src/main.ts",
     "check": "deno check apps/bot/src/main.ts",
     "test": "deno test -A",
