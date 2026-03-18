@@ -1,0 +1,16 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+.cursor
+coverage
+dist
+logs
+*.log
+
+tests
+misc
+agent-transcripts
+mcps

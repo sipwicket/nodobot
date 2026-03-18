@@ -1,4 +1,5 @@
 {
-  "name": "@nodobot/tests"
+  "name": "@nodobot/tests",
+  "exports": {}
 }
 

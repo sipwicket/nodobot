@@ -29,11 +29,24 @@
 4. Configure multitenancy placeholders:
    - **Subscription allowlist** (placeholder): `export ACTIVE_TENANTS="123456789,987654321"`
      - `TenantId` is the Telegram chat id (group id).
-   - **Per-tenant settings overrides**: copy `apps/bot/tenant_overrides.example.json` to `apps/bot/tenant_overrides.json` and edit.
+   - **Per-tenant settings overrides** (optional): create `apps/bot/tenant_overrides.json` and add a JSON object keyed by tenant/chat id.
 5. Run in dev/watch mode:
    - `deno task dev`
 6. Or run once:
    - `deno task start`
+
+## Docker Deployment
+
+1. Create and fill `.env` from `.env.example`:
+   - `cp .env.example .env`
+   - Required: `TELEGRAM_TOKEN`
+2. (Optional) Create `apps/bot/tenant_overrides.json` if you need per-tenant settings.
+3. Build and start:
+   - `docker compose up -d --build`
+4. Check logs:
+   - `docker compose logs -f bot`
+5. Stop:
+   - `docker compose down`
 
 ## Multitenancy Model (Current)
 
@@ -50,7 +63,7 @@
 - Validate feature parity (manual smoke test):
   - Duplicate link detection across YouTube/Twitter/TikTok/Instagram variants
   - Twitter/X embed rewriting to `fxtwitter.com`
-  - TikTok embed rewriting to `vxtiktok.com`
+  - TikTok embed rewriting to `fxtiktok.com`
   - Instagram native download + progress message + fallback to `kkinstagram.com` when rate-limited
   - `.webm` URL conversion to MP4 and original message deletion
   - Duplicate image detection (send same image twice)

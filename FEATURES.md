@@ -61,7 +61,7 @@ To avoid false negatives in duplicate detection (e.g., the same video shared via
 |------------|-----------------------|------------------------------|------------------------------------------------------------------------------------------|
 | YouTube    | Video ID              | `YOUTUBE-dQw4w9WgXcQ`       | `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed/`, `youtube.com/shorts/`        |
 | Twitter/X  | Tweet status ID       | `TWITTER-1234567890`         | `x.com`, `twitter.com`, `fxtwitter.com`, `vxtwitter.com`                                |
-| TikTok     | Video ID              | `TIKTOK-7123456789012345678` | `tiktok.com/@user/video/ID`, `vxtiktok.com/@user/video/ID`                              |
+| TikTok     | Video ID              | `TIKTOK-7123456789012345678` | `tiktok.com/@user/video/ID`, `fxtiktok.com/@user/video/ID`                              |
 | Instagram  | URL pathname          | `INSTAGRAM-/p/ABC123/`      | `instagram.com/p/`, `instagram.com/reel/`, `instagram.com/reels/`, `kkinstagram.com`    |
 
 - Each platform extractor uses regex to parse the unique content ID from any URL variant.
@@ -100,13 +100,13 @@ Identical in behavior to the Twitter fixer, but for TikTok URLs.
 
 1. Detects URLs from `tiktok.com` that are **not** already using a fixer domain.
 2. Extracts the TikTok author username and video ID via regex.
-3. Constructs a fixed URL: `https://vxtiktok.com/{username}/video/{id}`.
+3. Constructs a fixed URL: `https://fxtiktok.com/{username}/video/{id}`.
 4. Sends a new message in the format: `**{Author}** posted:\n{fixed URL}`.
 5. **Deletes the original message.**
 
 ### Recognized Fixer Domain (skip processing)
 
-- `vxtiktok.com`
+- `fxtiktok.com`
 
 ---
 
@@ -472,7 +472,7 @@ This matrix lists every implemented runtime behavior in one place.
 |-----------------|-----------------|----------------|--------------------------|----------------------|
 | Text message containing URL entity | Telegram `entities` with `type === 'url'` | Normalize URL and check link cache | If duplicate: reply with original poster + time delta | Duplicate-link warning reply |
 | First-time Twitter/X URL (`x.com` / `twitter.com`) | Extract tweet ID + username; check not already fixer domain | Replace with `fxtwitter.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
-| First-time TikTok URL (`tiktok.com`) | Extract video ID + username; check not already fixer domain | Replace with `vxtiktok.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
+| First-time TikTok URL (`tiktok.com`) | Extract video ID + username; check not already fixer domain | Replace with `fxtiktok.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
 | First-time Instagram URL | Extract pathname, shortcode, call Instagram API | Download media and resend as Telegram media group | On API/download failure: fallback to `kkinstagram.com` URL replacement | Native Telegram media or fallback link |
 | Message text is only a `.webm` URL | Regex match (`isExclusiveWebmUrl`) | Download, transcode to MP4, resend video, delete original | Reply with conversion error and clean up temp files | Converted inline video appears in chat |
 | Photo message | Download Telegram photo + compute hash | Check image cache and store if new | If duplicate: send duplicate image warning with time ago | Duplicate-image warning reply |
@@ -501,7 +501,7 @@ This matrix lists every implemented runtime behavior in one place.
 
 - Recognizes standard `tiktok.com/@user/video/{id}` links and already-fixed links.
 - Uses video ID as canonical duplicate key: `TIKTOK-{videoId}`.
-- Fixer URL generator emits `vxtiktok.com` format.
+- Fixer URL generator emits `fxtiktok.com` format.
 
 ### Instagram
 

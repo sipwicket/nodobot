@@ -13,7 +13,8 @@ export class DenoHttpDownloader implements HttpDownloadPort {
     const file = await Deno.open(outPath, { write: true, create: true, truncate: true });
     try {
       if (!res.body) throw new Error("download failed: missing body");
-      await res.body.pipeTo(file.writable);
+      // Keep explicit ownership of file close to avoid double-close races.
+      await res.body.pipeTo(file.writable, { preventClose: true });
     } finally {
       file.close();
     }

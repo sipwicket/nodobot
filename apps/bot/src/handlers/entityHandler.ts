@@ -16,9 +16,11 @@ import {
 import { checkAndStoreLink } from "@core/features/link/duplicateLinks.ts";
 import type { LinkCachePort } from "@core/contracts/cachePorts.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
+import { loggerFor } from "../logger.ts";
 
 export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
   return async function entityHandler(ctx: BotContext) {
+    const logger = loggerFor(ctx);
     const tenant = ctx.tenant;
     const msg = ctx.message;
     if (!tenant || !msg || typeof msg.text !== "string") return;
@@ -27,11 +29,36 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     const urls = extractUrlsFromEntities(msg.text, entities as any);
     if (urls.length === 0) return;
 
+    // Lightweight info-level logging for your `.webm` debugging session.
+    // This confirms whether Telegram entities give us any `.webm` URLs.
+    const lowerText = msg.text.toLowerCase();
+    const looksLikeWebm = lowerText.includes(".webm") || urls.some((u) => u.toLowerCase().includes(".webm"));
+    if (looksLikeWebm) {
+      const shortRawText = msg.text.length > 300 ? `${msg.text.slice(0, 297)}...` : msg.text;
+      logger.info("[entityHandler] extracted URLs (.webm session)", {
+        shortRawText,
+        urls,
+      });
+    }
+
+    logger.debug("[entityHandler] URLs detected in message", {
+      urlCount: urls.length,
+      features: {
+        duplicateLinks: tenant.settings.featureFlags.duplicateLinks,
+        twitterFix: tenant.settings.featureFlags.twitterFix,
+        tiktokFix: tenant.settings.featureFlags.tiktokFix,
+        instagramFallbackFix: tenant.settings.featureFlags.instagramFallbackFix,
+      },
+    });
+
     const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
     const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     // Duplicate detection applies to all URLs.
     if (tenant.settings.featureFlags.duplicateLinks) {
+      logger.debug("[entityHandler] duplicateLinks feature enabled, checking cache", {
+        urlCount: urls.length,
+      });
       for (const url of urls) {
         const dup = await checkAndStoreLink({
           tenantId: tenant.tenantId,
@@ -42,6 +69,11 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
           cacheSize: tenant.settings.duplicateLinks.cacheSize,
         });
         if (dup) {
+          logger.info("[entityHandler] duplicate link detected", {
+            url,
+            originalAuthor: dup.duplicateOf.author,
+            originalDateMs: dup.duplicateOf.dateMs,
+          });
           const agoMin = (Date.now() - dup.duplicateOf.dateMs) / 60000;
           const text = renderTemplate(tenant.settings.duplicateLinks.responseTemplate, {
             author: dup.duplicateOf.author,
@@ -62,6 +94,11 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
       const user = getTwitterUser(url);
       const id = getTwitterId(url);
       if (user && id) {
+        logger.info("[entityHandler] applying Twitter fixer", {
+          url,
+          user,
+          id,
+        });
         const fixed = fixTwitterUrl(user, id, tenant.settings.twitterFix.fixerDomain);
         const text = renderTemplate(tenant.settings.twitterFix.postTemplate, { author, url: fixed });
         await ctx.api.sendMessage(tenant.chatId, text, { parse_mode: "HTML", disable_web_page_preview: false });
@@ -77,6 +114,11 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
       const user = getTiktokUser(url);
       const id = getTiktokId(url);
       if (user && id) {
+        logger.info("[entityHandler] applying TikTok fixer", {
+          url,
+          user,
+          id,
+        });
         const fixed = fixTiktokUrl(user, id, tenant.settings.tiktokFix.fixerDomain);
         const text = renderTemplate(tenant.settings.tiktokFix.postTemplate, { author, url: fixed });
         await ctx.api.sendMessage(tenant.chatId, text, { parse_mode: "HTML", disable_web_page_preview: false });
@@ -95,6 +137,10 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     ) {
       const pathname = getInstagramPathname(url);
       if (pathname) {
+        logger.info("[entityHandler] applying Instagram fallback fixer", {
+          url,
+          pathname,
+        });
         const fixed = fixInstagramUrl(pathname, tenant.settings.instagram.fallbackFixDomain);
         const text = renderTemplate(tenant.settings.instagram.postTemplate, { author, count: "0" })
           .replace("Instagram media (0 items)", fixed);

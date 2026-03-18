@@ -4,6 +4,7 @@ import { extractInstagramMediaUrls } from "@core/features/instagram/mediaExtract
 import { extractShortcode, getInstagramPathname, fixInstagramUrl } from "@core/features/link/normalizers.ts";
 import { generateProgressBar } from "@shared/progressBar.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
+import { loggerFor } from "../logger.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
 function extForType(t: "video" | "image"): string {
@@ -15,6 +16,7 @@ export function createInstagramHandler() {
   const temp = new DenoTempFiles();
 
   return async function instagramHandler(ctx: BotContext) {
+    const logger = loggerFor(ctx);
     const tenant = ctx.tenant;
     const msg = ctx.message;
     if (!tenant || !msg || typeof msg.text !== "string") return;
@@ -30,6 +32,12 @@ export function createInstagramHandler() {
 
     const shortcode = extractShortcode(pathname);
     if (!shortcode) return;
+
+    logger.info("[instagramHandler] Instagram download triggered", {
+      url,
+      pathname,
+      shortcode,
+    });
 
     const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
 
@@ -61,6 +69,10 @@ export function createInstagramHandler() {
       const media = extractInstagramMediaUrls(apiResult);
       if (media.length === 0) throw new Error("instagram: no media items");
 
+      logger.debug("[instagramHandler] media metadata fetched", {
+        itemCount: media.length,
+      });
+
       tempDir = await temp.createTempDir("nodobot-ig-");
       if (reporter) await reporter(`${generateProgressBar(2, 5)} Downloading ${media.length} items...`);
 
@@ -81,6 +93,10 @@ export function createInstagramHandler() {
           ...it,
           caption: i === 0 && idx === 0 ? caption : undefined,
         }));
+        logger.debug("[instagramHandler] sending media batch", {
+          batchSize: batch.length,
+          totalItems: items.length,
+        });
         await ctx.api.sendMediaGroup(
           tenant.chatId,
           batch.map((it) => ({
@@ -97,6 +113,9 @@ export function createInstagramHandler() {
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
+      logger.error("[instagramHandler] Instagram download failed", {
+        error: errMsg,
+      });
       // Fallback to URL fixer (legacy behavior).
       if (tenant.settings.featureFlags.instagramFallbackFix) {
         const fixed = fixInstagramUrl(pathname, tenant.settings.instagram.fallbackFixDomain);

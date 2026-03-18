@@ -1,46 +1,63 @@
 export const TWITTER_FIXER_DOMAINS = ["fxtwitter.com", "vxtwitter.com"] as const;
-export const TIKTOK_FIXER_DOMAINS = ["vxtiktok.com"] as const;
-export const INSTAGRAM_FIXER_DOMAINS = ["kkinstagram.com"] as const;
+export const TIKTOK_FIXER_DOMAINS = ['fxtiktok.com'] as const;
+export const INSTAGRAM_FIXER_DOMAINS = ['kkinstagram.com'] as const;
 
-const TWITTER_DOMAINS = ["x.com", "twitter.com", ...TWITTER_FIXER_DOMAINS] as const;
-const TIKTOK_DOMAINS = ["tiktok.com", ...TIKTOK_FIXER_DOMAINS] as const;
-const INSTAGRAM_DOMAINS = ["instagram.com", ...INSTAGRAM_FIXER_DOMAINS] as const;
+const TWITTER_DOMAINS = [
+  'x.com',
+  'twitter.com',
+  ...TWITTER_FIXER_DOMAINS,
+] as const;
+const TIKTOK_DOMAINS = ['tiktok.com', ...TIKTOK_FIXER_DOMAINS] as const;
+const INSTAGRAM_DOMAINS = [
+  'instagram.com',
+  ...INSTAGRAM_FIXER_DOMAINS,
+] as const;
 
 export function getYoutubeId(url: string): string | undefined {
-  return /(youtu.*be.*)\/(watch\?v=|embed\/|v|shorts|)(.*?((?=[&#?])|$))/g.exec(url)?.[3];
+  return /(youtu.*be.*)\/(watch\?v=|embed\/|v|shorts|)(.*?((?=[&#?])|$))/g.exec(
+    url,
+  )?.[3];
 }
 
 export function getTwitterId(url: string): string | undefined {
-  if (!TWITTER_DOMAINS.some((d) => url.includes(d))) return undefined;
+  if (!TWITTER_DOMAINS.some(d => url.includes(d))) return undefined;
   return /\/(.\w+)(\/status\/)(\d+)/g.exec(url)?.[3];
 }
 
 export function twitterUrlIsFixed(url: string): boolean {
-  return TWITTER_FIXER_DOMAINS.some((d) => url.includes(d));
+  return TWITTER_FIXER_DOMAINS.some(d => url.includes(d));
 }
 
 export function getTwitterUser(url: string): string | undefined {
   return /\/(.\w+)(\/status\/)(\d+)/g.exec(url)?.[1];
 }
 
-export function fixTwitterUrl(username: string, tweetId: string, fixerDomain: string = "fxtwitter.com"): string {
+export function fixTwitterUrl(
+  username: string,
+  tweetId: string,
+  fixerDomain: string = 'fxtwitter.com',
+): string {
   return `https://${fixerDomain}/${username}/status/${tweetId}`;
 }
 
 export function getTiktokId(url: string): string | undefined {
-  if (!TIKTOK_DOMAINS.some((d) => url.includes(d))) return undefined;
+  if (!TIKTOK_DOMAINS.some(d => url.includes(d))) return undefined;
   return /\/(.\w+)(\/video\/)(\d+)/g.exec(url)?.[3];
 }
 
 export function tiktokUrlIsFixed(url: string): boolean {
-  return TIKTOK_FIXER_DOMAINS.some((d) => url.includes(d));
+  return TIKTOK_FIXER_DOMAINS.some(d => url.includes(d));
 }
 
 export function getTiktokUser(url: string): string | undefined {
   return /\/(.\w+)(\/video\/)(\d+)/g.exec(url)?.[1];
 }
 
-export function fixTiktokUrl(username: string, videoId: string, fixerDomain: string = "vxtiktok.com"): string {
+export function fixTiktokUrl(
+  username: string,
+  videoId: string,
+  fixerDomain: string = 'fxtiktok.com',
+): string {
   return `https://${fixerDomain}/${username}/video/${videoId}`;
 }
 

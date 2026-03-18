@@ -5,6 +5,10 @@ type LoggerOpts = {
   includeTenantId: boolean;
 };
 
+// Simple in-memory cache of tenant names by id so logs can include a
+// human-friendly name even when only tenantId is provided in later calls.
+const TENANT_NAME_CACHE = new Map<string, string>();
+
 const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 0,
   warn: 1,
@@ -36,12 +40,37 @@ export class Logger {
 
   #log(level: LogLevel, msg: string, meta?: Record<string, unknown>) {
     if (LEVEL_ORDER[level] > LEVEL_ORDER[this.#level]) return;
-    const payload: Record<string, unknown> = { level, msg, ts: new Date().toISOString() };
-    if (meta) Object.assign(payload, meta);
-    // Tenant id inclusion is handled by callers by injecting in meta.
-    if (!this.#includeTenantId && "tenantId" in payload) delete payload.tenantId;
+    const ts = new Date().toISOString();
+    const metaPayload: Record<string, unknown> = meta ? { ...meta } : {};
+    // Tenant details are injected by callers via meta (tenantId, tenantName).
+    const rawTenantId = metaPayload.tenantId;
+    const tenantId = typeof rawTenantId === "string" || typeof rawTenantId === "number"
+      ? String(rawTenantId)
+      : undefined;
+    const explicitTenantName = typeof metaPayload.tenantName === "string" ? metaPayload.tenantName : undefined;
 
-    const line = JSON.stringify(payload);
+    // Update cache whenever an explicit name is provided.
+    if (tenantId && explicitTenantName) {
+      TENANT_NAME_CACHE.set(tenantId, explicitTenantName);
+    }
+
+    const cachedTenantName = tenantId ? TENANT_NAME_CACHE.get(tenantId) : undefined;
+    const tenantName = explicitTenantName ?? cachedTenantName;
+    if (!this.#includeTenantId) {
+      if ("tenantId" in metaPayload) delete metaPayload.tenantId;
+      if ("tenantName" in metaPayload) delete metaPayload.tenantName;
+    }
+
+    const metaStr =
+      Object.keys(metaPayload).length > 0 ? ` ${JSON.stringify(metaPayload)}` : "";
+
+    const tenantPrefix =
+      this.#includeTenantId && tenantId != null
+        ? `[tenant:${String(tenantId)}${tenantName ? ` (${tenantName})` : ""}] `
+        : "";
+
+    const line = `[${ts}] [${level.toUpperCase()}] ${tenantPrefix}${msg}${metaStr}`;
+
     if (level === "error") console.error(line);
     else if (level === "warn") console.warn(line);
     else console.log(line);
