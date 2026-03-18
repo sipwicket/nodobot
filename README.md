@@ -55,6 +55,10 @@
 - Subscription/license verification is currently a placeholder:
   - Tenants listed in `ACTIVE_TENANTS` are treated as active.
   - Others receive `settings.subscription.inactiveMessage` and expensive handlers are skipped.
+- Runtime settings commands:
+  - `/settings` shows current feature flags for the tenant.
+  - `/enable <featureFlag>` and `/disable <featureFlag>` persist per-tenant flag changes.
+  - In groups, only admins can update settings; in private chats, the sender can update.
 
 ## Pilot and Cutover Checklist
 

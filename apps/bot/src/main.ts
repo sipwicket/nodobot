@@ -4,9 +4,15 @@ import { baseLogger } from "./logger.ts";
 import type { BotContext } from "./context.ts";
 import { tenantResolver } from "./middleware/tenant.ts";
 import { subscriptionGate } from "./middleware/subscription.ts";
-import { PlaceholderLicenseConnector, PlaceholderTenantSettingsConnector } from "@integrations/mod.ts";
+import {
+  PlaceholderLicenseConnector,
+  PlaceholderTenantSettingsConnector,
+} from "@integrations/mod.ts";
 import { SubscriptionGateUseCase } from "@core/tenancy/subscriptionGate.ts";
-import { loadActiveTenantsFromEnv, loadTenantOverridesFromJson } from "./bootstrap/placeholderConfig.ts";
+import {
+  loadActiveTenantsFromEnv,
+  loadTenantOverridesFromJson,
+} from "./bootstrap/placeholderConfig.ts";
 import { InMemoryLinkCache } from "@integrations/cache/inMemoryCaches.ts";
 import { createEntityHandler } from "./handlers/entityHandler.ts";
 import { createInstagramHandler } from "./handlers/instagramHandler.ts";
@@ -45,8 +51,14 @@ bot.catch((err) => {
 });
 
 // Placeholder connectors (to be replaced later).
-const overridesByTenant = await loadTenantOverridesFromJson("apps/bot/tenant_overrides.json");
-const settingsRepo = new PlaceholderTenantSettingsConnector({ overridesByTenant });
+const tenantOverridesPath = "apps/bot/tenant_overrides.json";
+const overridesByTenant = await loadTenantOverridesFromJson(
+  tenantOverridesPath,
+);
+const settingsRepo = new PlaceholderTenantSettingsConnector({
+  overridesByTenant,
+  persistPath: tenantOverridesPath,
+});
 const activeTenants = loadActiveTenantsFromEnv();
 const licenseRepo = new PlaceholderLicenseConnector({ activeTenants });
 if (activeTenants.size > 0) {
@@ -55,7 +67,9 @@ if (activeTenants.size > 0) {
     tenants: Array.from(activeTenants.values()),
   });
 } else {
-  baseLogger.info("No active subscription groups configured (ACTIVE_TENANTS is empty).");
+  baseLogger.info(
+    "No active subscription groups configured (ACTIVE_TENANTS is empty).",
+  );
 }
 const gate = new SubscriptionGateUseCase(licenseRepo);
 
@@ -83,14 +97,22 @@ function chainMessageHandler(
   };
 }
 
-bot.on("message:text", chainMessageHandler("entityHandler", createEntityHandler({ linkCache })));
-bot.on("message:text", chainMessageHandler("instagramHandler", createInstagramHandler()));
+bot.on(
+  "message:text",
+  chainMessageHandler("entityHandler", createEntityHandler({ linkCache })),
+);
+bot.on(
+  "message:text",
+  chainMessageHandler("instagramHandler", createInstagramHandler()),
+);
 bot.on("message:text", chainMessageHandler("webmHandler", createWebmHandler()));
-bot.on("message:photo", chainMessageHandler("imageHandler", createImageHandler({ imageCache })));
+bot.on(
+  "message:photo",
+  chainMessageHandler("imageHandler", createImageHandler({ imageCache })),
+);
 
-registerCommands(bot);
+registerCommands(bot, { settingsRepo });
 
 await bot.start({
   onStart: (info) => baseLogger.info(`Bot started as @${info.username}`),
 });
-

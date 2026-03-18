@@ -2,6 +2,11 @@ import type { TenantId } from "../types.ts";
 import type { TenantSettingsV1 } from "../tenancy/tenantSettings.ts";
 
 export interface TenantSettingsRepositoryPort {
-  getTenantSettings(tenantId: TenantId): Promise<Partial<TenantSettingsV1> | null>;
+  getTenantSettings(
+    tenantId: TenantId,
+  ): Promise<Partial<TenantSettingsV1> | null>;
+  setTenantSettings(
+    tenantId: TenantId,
+    overrides: Partial<TenantSettingsV1> | null,
+  ): Promise<void>;
 }
-

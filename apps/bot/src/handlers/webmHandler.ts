@@ -5,10 +5,35 @@ import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
+function resolveUploadTimeoutMs(): number {
+  const raw = Deno.env.get("WEBM_UPLOAD_TIMEOUT_MS");
+  if (!raw) return 180_000;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 180_000;
+  return Math.floor(parsed);
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeoutHandle: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+  }
+}
+
 export function createWebmHandler() {
   const downloader = new DenoHttpDownloader();
   const temp = new DenoTempFiles();
   const transcoder = new FfmpegTranscoder();
+  const uploadTimeoutMs = resolveUploadTimeoutMs();
 
   return async function webmHandler(ctx: BotContext) {
     const logger = loggerFor(ctx);
@@ -127,14 +152,29 @@ export function createWebmHandler() {
       logger.info("[webmHandler] step: upload start", {
         filename: "converted.mp4",
         sizeBytes: outStat.size,
+        timeoutMs: uploadTimeoutMs,
       });
-      const videoBytes = await Deno.readFile(outPath);
-      await ctx.api.sendVideo(
-        tenant.chatId,
-        new InputFile(videoBytes, "converted.mp4"),
-        { caption, parse_mode: "HTML" },
+      const prepareStartMs = Date.now();
+      const inputFile = new InputFile(outPath, "converted.mp4");
+      logger.info("[webmHandler] step: upload file prepared", {
+        filename: "converted.mp4",
+        sourcePath: outPath,
+        elapsedMs: Date.now() - prepareStartMs,
+      });
+
+      const uploadStartMs = Date.now();
+      await withTimeout(
+        ctx.api.sendVideo(
+          tenant.chatId,
+          inputFile,
+          { caption, parse_mode: "HTML" },
+        ),
+        uploadTimeoutMs,
+        "telegram sendVideo",
       );
-      logger.info("[webmHandler] step: upload done");
+      logger.info("[webmHandler] step: upload done", {
+        elapsedMs: Date.now() - uploadStartMs,
+      });
       if (statusMessageId != null) {
         logger.info("[webmHandler] step: status message cleanup start", {
           statusMessageId,
