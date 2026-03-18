@@ -1,3 +1,4 @@
+import "https://deno.land/std@0.224.0/dotenv/load.ts";
 import { Bot } from "npm:grammy@1.36.0";
 import { Logger } from "@shared/logger.ts";
 import type { BotContext } from "./context.ts";
