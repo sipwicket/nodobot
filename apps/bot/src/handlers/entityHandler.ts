@@ -1,3 +1,4 @@
+import { GrammyError } from "npm:grammy@1.36.0";
 import type { BotContext } from "../context.ts";
 import { extractUrlsFromEntities } from "@core/features/link/urlExtract.ts";
 import {
@@ -16,7 +17,67 @@ import {
 import { checkAndStoreLink } from "@core/features/link/duplicateLinks.ts";
 import type { LinkCachePort } from "@core/contracts/cachePorts.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
-import { loggerFor } from "../logger.ts";
+import { loggerFor, type TenantAwareLogger } from "../logger.ts";
+
+async function deleteOriginalIfPossible(
+  ctx: BotContext,
+  logger: TenantAwareLogger,
+  chatId: string,
+  originalMessageId: number,
+  deleteMessage: (chatId: string, messageId: number) => Promise<unknown>,
+): Promise<void> {
+  try {
+    await deleteMessage(chatId, originalMessageId);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("[entityHandler] deleteMessage failed; original left in chat", {
+      chatId,
+      messageId: originalMessageId,
+      error: message,
+    });
+
+    const isDeleteFailure =
+      err instanceof GrammyError &&
+      err.method === "deleteMessage" &&
+      err.error_code === 400 &&
+      err.description.toLowerCase().includes("can't be deleted");
+
+    if (!isDeleteFailure) return;
+
+    let botUserId: number;
+    try {
+      botUserId = (await ctx.api.getMe()).id;
+    } catch {
+      return;
+    }
+
+    let canDelete: boolean | undefined;
+    try {
+      const member = await ctx.api.getChatMember(chatId, botUserId);
+      if (member.status === "creator") canDelete = true;
+      else if (member.status === "administrator") canDelete = member.can_delete_messages === true;
+      else canDelete = false;
+    } catch {
+      return;
+    }
+
+    if (canDelete !== false) return;
+
+    const hint =
+      "I couldn’t delete the original message. Make me a group admin and turn on <b>Delete messages</b> so I can remove the raw link after posting the fixed version.";
+
+    await ctx.api
+      .sendMessage(chatId, hint, {
+        parse_mode: "HTML",
+        reply_parameters: { message_id: originalMessageId },
+      })
+      .catch((sendErr: unknown) => {
+        logger.warn("[entityHandler] failed to send delete-permissions hint", {
+          error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+        });
+      });
+  }
+}
 
 export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
   return async function entityHandler(ctx: BotContext) {
@@ -101,9 +162,13 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
         });
         const fixed = fixTwitterUrl(user, id, tenant.settings.twitterFix.fixerDomain);
         const text = renderTemplate(tenant.settings.twitterFix.postTemplate, { author, url: fixed });
-        await ctx.api.sendMessage(tenant.chatId, text, { parse_mode: "HTML", disable_web_page_preview: false });
+        await ctx.api.sendMessage(tenant.chatId, text, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: false },
+        });
         if (tenant.settings.twitterFix.deleteOriginalMessage) {
-          await ctx.api.deleteMessage(tenant.chatId, msg.message_id);
+          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
+            ctx.api.deleteMessage(c, m));
         }
       }
       return;
@@ -121,9 +186,13 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
         });
         const fixed = fixTiktokUrl(user, id, tenant.settings.tiktokFix.fixerDomain);
         const text = renderTemplate(tenant.settings.tiktokFix.postTemplate, { author, url: fixed });
-        await ctx.api.sendMessage(tenant.chatId, text, { parse_mode: "HTML", disable_web_page_preview: false });
+        await ctx.api.sendMessage(tenant.chatId, text, {
+          parse_mode: "HTML",
+          link_preview_options: { is_disabled: false },
+        });
         if (tenant.settings.tiktokFix.deleteOriginalMessage) {
-          await ctx.api.deleteMessage(tenant.chatId, msg.message_id);
+          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
+            ctx.api.deleteMessage(c, m));
         }
       }
       return;
@@ -146,10 +215,11 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
           .replace("Instagram media (0 items)", fixed);
         await ctx.api.sendMessage(tenant.chatId, `<b>${author}</b> posted:\n${fixed}`, {
           parse_mode: "HTML",
-          disable_web_page_preview: false,
+          link_preview_options: { is_disabled: false },
         });
         if (tenant.settings.instagram.deleteOriginalMessage) {
-          await ctx.api.deleteMessage(tenant.chatId, msg.message_id);
+          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
+            ctx.api.deleteMessage(c, m));
         }
       }
       return;
