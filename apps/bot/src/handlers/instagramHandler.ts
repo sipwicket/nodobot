@@ -84,8 +84,11 @@ export function createInstagramHandler() {
         items.push({ kind: m.type === "video" ? "video" : "image", path: outPath });
       }
 
-      if (reporter) await reporter(`${generateProgressBar(4, 5)} Sending to chat...`);
       const caption = renderTemplate(tenant.settings.instagram.postTemplate, { author, count: String(items.length) });
+      // Remove progress before media so "Sending to chat..." never stays next to the album.
+      if (progress) {
+        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => {});
+      }
       // Telegram albums max 10.
       const batchSize = Math.min(tenant.settings.instagram.maxMediaGroupSize, 10);
       for (let i = 0; i < items.length; i += batchSize) {
@@ -106,10 +109,6 @@ export function createInstagramHandler() {
             parse_mode: "HTML",
           })) as any,
         );
-      }
-
-      if (progress) {
-        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => {});
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);

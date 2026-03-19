@@ -16,6 +16,28 @@ type MutableTenantOverrides =
   };
 type FeatureFlagName = Extract<keyof TenantSettingsV1['featureFlags'], string>;
 
+const FEATURE_FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
+  duplicateLinks:
+    "Warns when someone posts a link that was already shared in this chat.",
+  duplicateImages:
+    "Detects visually similar images and replies with your duplicate-image template.",
+  twitterFix:
+    "Rewrites X/Twitter links (e.g. to a fixer host) so embeds and media work better.",
+  tiktokFix:
+    "Rewrites TikTok links (e.g. to a fixer host) so they open or play more reliably.",
+  instagramDownload:
+    "Turns on Instagram link processing (download and repost media per your Instagram config).",
+  instagramFallbackFix:
+    "Rewrites Instagram links to your fallback fixer when native download is not used first (IG download off or not preferred).",
+  webmConversion:
+    "Converts incoming WebM videos to a format that plays smoothly in Telegram.",
+  directReply:
+    "Replies automatically to messages using the configured random or fallback replies.",
+  randomImage:
+    "Turns on /randomimage, which fetches a random image from your configured endpoints.",
+  helpCommand: "Allows this /help text (and your tenant help alias) to work.",
+};
+
 function parseCommandArgs(ctx: BotContext): string[] {
   const text = ctx.message?.text?.trim();
   if (!text) return [];
@@ -164,18 +186,37 @@ export function registerCommands(
     const logger = loggerFor(ctx);
     const tenant = ctx.tenant;
     if (!tenant || !tenant.settings.featureFlags.helpCommand) return;
-    const cmds = [
-      "/settings",
-      "/enable <featureFlag>",
-      "/disable <featureFlag>",
-      `/${tenant.settings.commands.setThresholdCommand}`,
-      `/${tenant.settings.commands.setResolutionCommand}`,
-      `/${tenant.settings.commands.increaseSensitivityCommand}`,
+    const setTh = tenant.settings.commands.setThresholdCommand;
+    const setRes = tenant.settings.commands.setResolutionCommand;
+    const sens = tenant.settings.commands.increaseSensitivityCommand;
+    const flagNames = Object.keys(
+      tenant.settings.featureFlags,
+    ) as FeatureFlagName[];
+    flagNames.sort((a, b) => a.localeCompare(b));
+    const flagLines = flagNames.map((flag) =>
+      `• <b>${formatFlagName(flag)}</b>\n  ${FEATURE_FLAG_DESCRIPTIONS[flag]}`
+    );
+
+    const lines = [
+      "<b>Commands</b>",
+      "",
+      "<b>/settings</b>",
+      "Shows this chat’s tenant id, whether you can change settings, which config sections have overrides, and the on/off state of each feature. Chat admins get inline buttons to toggle flags.",
+      "",
+      "<b>/enable</b> &amp; <b>/disable</b> <code>&lt;featureFlag&gt;</code>",
+      "Same toggles as the settings buttons; flag names match the labels (e.g. <code>duplicateLinks</code>). Admins only.",
+      "",
+      `<b>/${setTh}</b>, <b>/${setRes}</b>, <b>/${sens}</b>`,
+      "Tenant-specific media or sensitivity commands (see your operator docs for exact behavior).",
+      "",
+      "<b>Feature flags</b> (from /settings)",
+      "",
+      ...flagLines,
     ];
     logger.info("[commands] /help invoked", {
-      commands: cmds,
+      commands: lines,
     });
-    await ctx.reply(cmds.join("; "));
+    await ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
   };
 
   // Register default help plus tenant-configurable alias (runtime-safe even if different per tenant).

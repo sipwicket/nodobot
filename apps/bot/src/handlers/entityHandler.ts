@@ -198,8 +198,13 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
       return;
     }
 
-    // Instagram fallback fixer (native download handler will supersede later).
+    // Instagram kkinstagram link: only when native download is off (or not preferred).
+    // If native download runs, instagramHandler posts the fixer only after a failed download.
+    const instagramNativeFirst =
+      tenant.settings.featureFlags.instagramDownload &&
+      tenant.settings.instagram.preferNativeDownload;
     if (
+      !instagramNativeFirst &&
       tenant.settings.featureFlags.instagramFallbackFix &&
       getInstagramPathname(url) &&
       !instagramUrlIsFixed(url)
