@@ -84,7 +84,7 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     const logger = loggerFor(ctx);
     const tenant = ctx.tenant;
     const msg = ctx.message;
-    if (!tenant || !msg || typeof msg.text !== "string") return;
+    if (!tenant || !msg || typeof msg.text !== 'string') return;
 
     const entities = msg.entities ?? [];
     const urls = extractUrlsFromEntities(msg.text, entities as any);
@@ -93,16 +93,19 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     // Lightweight info-level logging for your `.webm` debugging session.
     // This confirms whether Telegram entities give us any `.webm` URLs.
     const lowerText = msg.text.toLowerCase();
-    const looksLikeWebm = lowerText.includes(".webm") || urls.some((u) => u.toLowerCase().includes(".webm"));
+    const looksLikeWebm =
+      lowerText.includes('.webm') ||
+      urls.some(u => u.toLowerCase().includes('.webm'));
     if (looksLikeWebm) {
-      const shortRawText = msg.text.length > 300 ? `${msg.text.slice(0, 297)}...` : msg.text;
-      logger.info("[entityHandler] extracted URLs (.webm session)", {
+      const shortRawText =
+        msg.text.length > 300 ? `${msg.text.slice(0, 297)}...` : msg.text;
+      logger.info('[entityHandler] extracted URLs (.webm session)', {
         shortRawText,
         urls,
       });
     }
 
-    logger.debug("[entityHandler] URLs detected in message", {
+    logger.debug('[entityHandler] URLs detected in message', {
       urlCount: urls.length,
       features: {
         duplicateLinks: tenant.settings.featureFlags.duplicateLinks,
@@ -112,14 +115,17 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
       },
     });
 
-    const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
+    const author = msg.from?.first_name ?? msg.from?.username ?? 'Someone';
     const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     // Duplicate detection applies to all URLs.
     if (tenant.settings.featureFlags.duplicateLinks) {
-      logger.debug("[entityHandler] duplicateLinks feature enabled, checking cache", {
-        urlCount: urls.length,
-      });
+      logger.debug(
+        '[entityHandler] duplicateLinks feature enabled, checking cache',
+        {
+          urlCount: urls.length,
+        },
+      );
       for (const url of urls) {
         const dup = await checkAndStoreLink({
           tenantId: tenant.tenantId,
@@ -130,16 +136,19 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
           cacheSize: tenant.settings.duplicateLinks.cacheSize,
         });
         if (dup) {
-          logger.info("[entityHandler] duplicate link detected", {
+          logger.info('[entityHandler] duplicate link detected', {
             url,
             originalAuthor: dup.duplicateOf.author,
             originalDateMs: dup.duplicateOf.dateMs,
           });
           const agoMin = (Date.now() - dup.duplicateOf.dateMs) / 60000;
-          const text = renderTemplate(tenant.settings.duplicateLinks.responseTemplate, {
-            author: dup.duplicateOf.author,
-            ago: `${agoMin.toFixed(1)} minutes ago`,
-          });
+          const text = renderTemplate(
+            tenant.settings.duplicateLinks.responseTemplate,
+            {
+              author: dup.duplicateOf.author,
+              ago: `${agoMin.toFixed(1)} minutes ago`,
+            },
+          );
           await ctx.reply(text, { reply_to_message_id: msg.message_id });
         }
       }
@@ -151,54 +160,86 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     const url = urls[0];
 
     // Twitter
-    if (tenant.settings.featureFlags.twitterFix && getTwitterId(url) && !twitterUrlIsFixed(url)) {
+    if (
+      tenant.settings.featureFlags.twitterFix &&
+      getTwitterId(url) &&
+      !twitterUrlIsFixed(url)
+    ) {
       const user = getTwitterUser(url);
       const id = getTwitterId(url);
       if (user && id) {
-        logger.info("[entityHandler] applying Twitter fixer", {
+        logger.info('[entityHandler] applying Twitter fixer', {
           url,
           user,
           id,
         });
-        const fixed = fixTwitterUrl(user, id, tenant.settings.twitterFix.fixerDomain);
-        const text = renderTemplate(tenant.settings.twitterFix.postTemplate, { author, url: fixed });
+        const fixed = fixTwitterUrl(
+          user,
+          id,
+          tenant.settings.twitterFix.fixerDomain,
+        );
+        const text = renderTemplate(tenant.settings.twitterFix.postTemplate, {
+          author,
+          url: fixed,
+        });
         await ctx.api.sendMessage(tenant.chatId, text, {
-          parse_mode: "HTML",
+          parse_mode: 'HTML',
           link_preview_options: { is_disabled: false },
         });
         if (tenant.settings.twitterFix.deleteOriginalMessage) {
-          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
-            ctx.api.deleteMessage(c, m));
+          await deleteOriginalIfPossible(
+            ctx,
+            logger,
+            tenant.chatId,
+            msg.message_id,
+            (c, m) => ctx.api.deleteMessage(c, m),
+          );
         }
       }
       return;
     }
 
     // TikTok
-    if (tenant.settings.featureFlags.tiktokFix && getTiktokId(url) && !tiktokUrlIsFixed(url)) {
+    if (
+      tenant.settings.featureFlags.tiktokFix &&
+      getTiktokId(url) &&
+      !tiktokUrlIsFixed(url)
+    ) {
       const user = getTiktokUser(url);
       const id = getTiktokId(url);
       if (user && id) {
-        logger.info("[entityHandler] applying TikTok fixer", {
+        logger.info('[entityHandler] applying TikTok fixer', {
           url,
           user,
           id,
         });
-        const fixed = fixTiktokUrl(user, id, tenant.settings.tiktokFix.fixerDomain);
-        const text = renderTemplate(tenant.settings.tiktokFix.postTemplate, { author, url: fixed });
+        const fixed = fixTiktokUrl(
+          user,
+          id,
+          tenant.settings.tiktokFix.fixerDomain,
+        );
+        const text = renderTemplate(tenant.settings.tiktokFix.postTemplate, {
+          author,
+          url: fixed,
+        });
         await ctx.api.sendMessage(tenant.chatId, text, {
-          parse_mode: "HTML",
+          parse_mode: 'HTML',
           link_preview_options: { is_disabled: false },
         });
         if (tenant.settings.tiktokFix.deleteOriginalMessage) {
-          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
-            ctx.api.deleteMessage(c, m));
+          await deleteOriginalIfPossible(
+            ctx,
+            logger,
+            tenant.chatId,
+            msg.message_id,
+            (c, m) => ctx.api.deleteMessage(c, m),
+          );
         }
       }
       return;
     }
 
-    // Instagram kkinstagram link: only when native download is off (or not preferred).
+    // Instagram kksave link: only when native download is off (or not preferred).
     // If native download runs, instagramHandler posts the fixer only after a failed download.
     const instagramNativeFirst =
       tenant.settings.featureFlags.instagramDownload &&
@@ -211,20 +252,34 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     ) {
       const pathname = getInstagramPathname(url);
       if (pathname) {
-        logger.info("[entityHandler] applying Instagram fallback fixer", {
+        logger.info('[entityHandler] applying Instagram fallback fixer', {
           url,
           pathname,
         });
-        const fixed = fixInstagramUrl(pathname, tenant.settings.instagram.fallbackFixDomain);
-        const text = renderTemplate(tenant.settings.instagram.postTemplate, { author, count: "0" })
-          .replace("Instagram media (0 items)", fixed);
-        await ctx.api.sendMessage(tenant.chatId, `<b>${author}</b> posted:\n${fixed}`, {
-          parse_mode: "HTML",
-          link_preview_options: { is_disabled: false },
-        });
+        const fixed = fixInstagramUrl(
+          pathname,
+          tenant.settings.instagram.fallbackFixDomain,
+        );
+        const text = renderTemplate(tenant.settings.instagram.postTemplate, {
+          author,
+          count: '0',
+        }).replace('Instagram media (0 items)', fixed);
+        await ctx.api.sendMessage(
+          tenant.chatId,
+          `<b>${author}</b> posted:\n${fixed}`,
+          {
+            parse_mode: 'HTML',
+            link_preview_options: { is_disabled: false },
+          },
+        );
         if (tenant.settings.instagram.deleteOriginalMessage) {
-          await deleteOriginalIfPossible(ctx, logger, tenant.chatId, msg.message_id, (c, m) =>
-            ctx.api.deleteMessage(c, m));
+          await deleteOriginalIfPossible(
+            ctx,
+            logger,
+            tenant.chatId,
+            msg.message_id,
+            (c, m) => ctx.api.deleteMessage(c, m),
+          );
         }
       }
       return;

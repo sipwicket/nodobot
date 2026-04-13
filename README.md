@@ -68,7 +68,7 @@
   - Duplicate link detection across YouTube/Twitter/TikTok/Instagram variants
   - Twitter/X embed rewriting to `fxtwitter.com`
   - TikTok embed rewriting to `fxtiktok.com`
-  - Instagram native download + progress message + fallback to `kkinstagram.com` when rate-limited
+  - Instagram native download + progress message + fallback to `kksave.com` when rate-limited
   - `.webm` URL conversion to MP4 and original message deletion
   - Duplicate image detection (send same image twice)
   - `/help` output and direct-reply behavior

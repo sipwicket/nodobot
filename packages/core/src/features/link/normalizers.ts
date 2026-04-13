@@ -1,6 +1,6 @@
 export const TWITTER_FIXER_DOMAINS = ["fxtwitter.com", "vxtwitter.com"] as const;
 export const TIKTOK_FIXER_DOMAINS = ['fxtiktok.com'] as const;
-export const INSTAGRAM_FIXER_DOMAINS = ['kkinstagram.com'] as const;
+export const INSTAGRAM_FIXER_DOMAINS = ['kksave.com'] as const;
 
 const TWITTER_DOMAINS = [
   'x.com',
@@ -62,7 +62,7 @@ export function fixTiktokUrl(
 }
 
 export function getInstagramPathname(url: string): string | undefined {
-  if (!INSTAGRAM_DOMAINS.some((d) => url.includes(d))) return undefined;
+  if (!INSTAGRAM_DOMAINS.some(d => url.includes(d))) return undefined;
   try {
     return new URL(url).pathname;
   } catch {
@@ -71,10 +71,13 @@ export function getInstagramPathname(url: string): string | undefined {
 }
 
 export function instagramUrlIsFixed(url: string): boolean {
-  return INSTAGRAM_FIXER_DOMAINS.some((d) => url.includes(d));
+  return INSTAGRAM_FIXER_DOMAINS.some(d => url.includes(d));
 }
 
-export function fixInstagramUrl(pathname: string, fixerDomain: string = "kkinstagram.com"): string {
+export function fixInstagramUrl(
+  pathname: string,
+  fixerDomain: string = 'kksave.com',
+): string {
   return `https://${fixerDomain}${pathname}`;
 }
 

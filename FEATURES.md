@@ -62,7 +62,7 @@ To avoid false negatives in duplicate detection (e.g., the same video shared via
 | YouTube    | Video ID              | `YOUTUBE-dQw4w9WgXcQ`       | `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed/`, `youtube.com/shorts/`        |
 | Twitter/X  | Tweet status ID       | `TWITTER-1234567890`         | `x.com`, `twitter.com`, `fxtwitter.com`, `vxtwitter.com`                                |
 | TikTok     | Video ID              | `TIKTOK-7123456789012345678` | `tiktok.com/@user/video/ID`, `fxtiktok.com/@user/video/ID`                              |
-| Instagram  | URL pathname          | `INSTAGRAM-/p/ABC123/`      | `instagram.com/p/`, `instagram.com/reel/`, `instagram.com/reels/`, `kkinstagram.com`    |
+| Instagram  | URL pathname          | `INSTAGRAM-/p/ABC123/`      | `instagram.com/p/`, `instagram.com/reel/`, `instagram.com/reels/`, `kksave.com`    |
 
 - Each platform extractor uses regex to parse the unique content ID from any URL variant.
 - Non-recognized URLs are cached as-is (raw URL string).
@@ -162,7 +162,7 @@ The most complex feature. When a user posts an Instagram link, the bot attempts 
 
 If media download fails for any reason, the bot:
 1. Sends an error message explaining the failure (with special messaging for rate limits).
-2. Falls back to **URL fixing** (replacing `instagram.com` with `kkinstagram.com`).
+2. Falls back to **URL fixing** (replacing `instagram.com` with `kksave.com`).
 
 ---
 
@@ -174,7 +174,7 @@ Used as a fallback when direct Instagram media downloading fails.
 
 ### Behavior
 
-- Replaces `instagram.com` in the URL with `kkinstagram.com` for better Telegram embeds.
+- Replaces `instagram.com` in the URL with `kksave.com` for better Telegram embeds.
 - Sends the fixed URL with the author attribution.
 
 ---
@@ -473,7 +473,7 @@ This matrix lists every implemented runtime behavior in one place.
 | Text message containing URL entity | Telegram `entities` with `type === 'url'` | Normalize URL and check link cache | If duplicate: reply with original poster + time delta | Duplicate-link warning reply |
 | First-time Twitter/X URL (`x.com` / `twitter.com`) | Extract tweet ID + username; check not already fixer domain | Replace with `fxtwitter.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
 | First-time TikTok URL (`tiktok.com`) | Extract video ID + username; check not already fixer domain | Replace with `fxtiktok.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
-| First-time Instagram URL | Extract pathname, shortcode, call Instagram API | Download media and resend as Telegram media group | On API/download failure: fallback to `kkinstagram.com` URL replacement | Native Telegram media or fallback link |
+| First-time Instagram URL | Extract pathname, shortcode, call Instagram API | Download media and resend as Telegram media group | On API/download failure: fallback to `kksave.com` URL replacement | Native Telegram media or fallback link |
 | Message text is only a `.webm` URL | Regex match (`isExclusiveWebmUrl`) | Download, transcode to MP4, resend video, delete original | Reply with conversion error and clean up temp files | Converted inline video appears in chat |
 | Photo message | Download Telegram photo + compute hash | Check image cache and store if new | If duplicate: send duplicate image warning with time ago | Duplicate-image warning reply |
 | `/help` command | Bot command handler | Print configured command IDs | N/A | Semicolon-separated command list |

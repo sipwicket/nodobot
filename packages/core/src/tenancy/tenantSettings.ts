@@ -19,23 +19,23 @@ export type TenantSettingsV1 = {
   duplicateImages: {
     cacheSize: number;
     hashBits: 8 | 12 | 16;
-    matchMode: "exact";
+    matchMode: 'exact';
     warningImageUrl: string;
     responseTemplate: string;
   };
   twitterFix: {
-    fixerDomain: "fxtwitter.com";
+    fixerDomain: 'fxtwitter.com';
     deleteOriginalMessage: boolean;
     postTemplate: string;
   };
   tiktokFix: {
-    fixerDomain: "fxtiktok.com";
+    fixerDomain: 'fxtiktok.com';
     deleteOriginalMessage: boolean;
     postTemplate: string;
   };
   instagram: {
     preferNativeDownload: boolean;
-    fallbackFixDomain: "kkinstagram.com";
+    fallbackFixDomain: 'kksave.com';
     minRequestIntervalMs: number;
     retryBackoffMs: [number, number, number, number];
     progressUpdates: boolean;
@@ -44,10 +44,10 @@ export type TenantSettingsV1 = {
     postTemplate: string;
   };
   webmConversion: {
-    mode: "standard" | "ultraFast";
+    mode: 'standard' | 'ultraFast';
     deleteOriginalMessage: boolean;
     maxInputSizeMb: number;
-    ffmpegPreset: "ultrafast";
+    ffmpegPreset: 'ultrafast';
     crf: number;
     audioBitrateKbps: number;
     postTemplate: string;
@@ -59,7 +59,7 @@ export type TenantSettingsV1 = {
     increaseSensitivityCommand: string;
   };
   directReply: {
-    mode: "randomPool" | "singleFallback";
+    mode: 'randomPool' | 'singleFallback';
     randomReplies: string[];
     fallbackReply: string;
   };
@@ -72,7 +72,7 @@ export type TenantSettingsV1 = {
     recheckTtlSeconds: number;
   };
   observability: {
-    logLevel: "error" | "warn" | "info" | "debug";
+    logLevel: 'error' | 'warn' | 'info' | 'debug';
     includeTenantIdInLogs: boolean;
   };
 };
@@ -94,66 +94,66 @@ export function defaultTenantSettingsV1(): TenantSettingsV1 {
     },
     duplicateLinks: {
       cacheSize: 50,
-      responseTemplate: "Found an identical link! Posted by {author}, {ago}.",
+      responseTemplate: 'Found an identical link! Posted by {author}, {ago}.',
     },
     duplicateImages: {
       cacheSize: 50,
       hashBits: 8,
-      matchMode: "exact",
-      warningImageUrl: "https://i.imgur.com/6o7QpYd.jpeg",
-      responseTemplate: "Found a similar image! Posted by {author}, {ago}.",
+      matchMode: 'exact',
+      warningImageUrl: 'https://i.imgur.com/6o7QpYd.jpeg',
+      responseTemplate: 'Found a similar image! Posted by {author}, {ago}.',
     },
     twitterFix: {
-      fixerDomain: "fxtwitter.com",
+      fixerDomain: 'fxtwitter.com',
       deleteOriginalMessage: true,
-      postTemplate: "<b>{author}</b> posted:\n{url}",
+      postTemplate: '<b>{author}</b> posted:\n{url}',
     },
     tiktokFix: {
-      fixerDomain: "fxtiktok.com",
+      fixerDomain: 'fxtiktok.com',
       deleteOriginalMessage: true,
-      postTemplate: "<b>{author}</b> posted:\n{url}",
+      postTemplate: '<b>{author}</b> posted:\n{url}',
     },
     instagram: {
       preferNativeDownload: true,
-      fallbackFixDomain: "kkinstagram.com",
+      fallbackFixDomain: 'kksave.com',
       minRequestIntervalMs: 2000,
       retryBackoffMs: [1000, 2000, 5000, 15000],
       progressUpdates: true,
       maxMediaGroupSize: 10,
       deleteOriginalMessage: true,
-      postTemplate: "<b>{author}</b> posted: Instagram media ({count} items)",
+      postTemplate: '<b>{author}</b> posted: Instagram media ({count} items)',
     },
     webmConversion: {
-      mode: "standard",
+      mode: 'standard',
       deleteOriginalMessage: true,
       maxInputSizeMb: 100,
-      ffmpegPreset: "ultrafast",
+      ffmpegPreset: 'ultrafast',
       crf: 28,
       audioBitrateKbps: 128,
-      postTemplate: "<b>{author}</b> shared a video (converted from webm)",
+      postTemplate: '<b>{author}</b> shared a video (converted from webm)',
     },
     commands: {
-      helpCommand: "help",
-      setThresholdCommand: "setthreshold",
-      setResolutionCommand: "setresolution",
-      increaseSensitivityCommand: "increasesensitivity",
+      helpCommand: 'help',
+      setThresholdCommand: 'setthreshold',
+      setResolutionCommand: 'setresolution',
+      increaseSensitivityCommand: 'increasesensitivity',
     },
     directReply: {
-      mode: "randomPool",
+      mode: 'randomPool',
       randomReplies: [],
-      fallbackReply: "Functionality not implemented, {username}.",
+      fallbackReply: 'Functionality not implemented, {username}.',
     },
     randomImage: {
       endpoints: [],
-      sendingMessage: "Sending random image...",
+      sendingMessage: 'Sending random image...',
     },
     subscription: {
       inactiveMessage:
-        "This group needs an active subscription to use this bot.",
+        'This group needs an active subscription to use this bot.',
       recheckTtlSeconds: 60,
     },
     observability: {
-      logLevel: "info",
+      logLevel: 'info',
       includeTenantIdInLogs: true,
     },
   };
@@ -270,7 +270,7 @@ export function validateTenantSettingsV1(input: unknown): TenantSettingsV1 {
 
   merged.twitterFix.fixerDomain = "fxtwitter.com";
   merged.tiktokFix.fixerDomain = "fxtiktok.com";
-  merged.instagram.fallbackFixDomain = "kkinstagram.com";
+  merged.instagram.fallbackFixDomain = 'kksave.com';
   merged.webmConversion.ffmpegPreset = "ultrafast";
 
   merged.instagram.minRequestIntervalMs = clamp(
