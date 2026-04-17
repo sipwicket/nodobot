@@ -3,6 +3,8 @@ export type InstaloaderPostDownloaderOpts = {
   command?: string;
   /** Instagram username for `--login` (uses Instaloader session file). */
   login?: string;
+  /** Instagram password for `--password` (non-interactive login; use with `--login`). */
+  password?: string;
   /** Path passed to Instaloader `-f` / `--sessionfile` (load/store session). */
   sessionFile?: string;
   maxConnectionAttempts?: number;
@@ -66,12 +68,14 @@ function decodeErr(bytes: Uint8Array, max = 4000): string {
 export class InstaloaderPostDownloader {
   #command: string;
   #login?: string;
+  #password?: string;
   #sessionFile?: string;
   #maxConnectionAttempts: number;
 
   constructor(opts: InstaloaderPostDownloaderOpts = {}) {
     this.#command = opts.command ?? "instaloader";
     this.#login = opts.login;
+    this.#password = opts.password;
     this.#sessionFile = opts.sessionFile;
     this.#maxConnectionAttempts = opts.maxConnectionAttempts ?? 5;
   }
@@ -90,6 +94,9 @@ export class InstaloaderPostDownloader {
     }
     if (this.#login) {
       args.push("--login", this.#login);
+    }
+    if (this.#password) {
+      args.push("--password", this.#password);
     }
     args.push(
       "-q",

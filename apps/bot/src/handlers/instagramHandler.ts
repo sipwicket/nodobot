@@ -54,6 +54,7 @@ export function createInstagramHandler() {
     const igDownloader = new InstaloaderPostDownloader({
       command: Deno.env.get("INSTALOADER_CMD") ?? undefined,
       login: Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
+      password: Deno.env.get("INSTALOADER_PASSWORD") ?? undefined,
       sessionFile: Deno.env.get("INSTALOADER_SESSION_FILE") ?? undefined,
     });
 
