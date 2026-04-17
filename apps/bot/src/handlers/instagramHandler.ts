@@ -37,7 +37,7 @@ export function createInstagramHandler() {
 
     // Delete original early (legacy behavior).
     if (tenant.settings.instagram.deleteOriginalMessage) {
-      await ctx.api.deleteMessage(tenant.chatId, msg.message_id).catch(() => {});
+      await ctx.api.deleteMessage(tenant.chatId, msg.message_id).catch(() => { });
     }
 
     // Progress message.
@@ -47,7 +47,7 @@ export function createInstagramHandler() {
 
     const reporter = progress
       ? async (text: string) => {
-        await ctx.api.editMessageText(tenant.chatId, progress.message_id, text).catch(() => {});
+        await ctx.api.editMessageText(tenant.chatId, progress.message_id, text).catch(() => { });
       }
       : undefined;
 
@@ -69,7 +69,7 @@ export function createInstagramHandler() {
     let tempDir: string | null = null;
     try {
       tempDir = await temp.createTempDir("nodobot-ig-");
-      if (reporter) await reporter(`${generateProgressBar(2, 5)} Downloading with Instaloader...`);
+      if (reporter) await reporter(`${generateProgressBar(2, 5)} Downloading media...`);
 
       const downloaded = await igDownloader.downloadPost(shortcode, tempDir);
       if (downloaded.length === 0) throw new Error("instagram: no media items");
@@ -86,7 +86,7 @@ export function createInstagramHandler() {
       const caption = renderTemplate(tenant.settings.instagram.postTemplate, { author, count: String(items.length) });
       // Remove progress before media so "Sending to chat..." never stays next to the album.
       if (progress) {
-        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => {});
+        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => { });
       }
       // Telegram albums max 10.
       const batchSize = Math.min(tenant.settings.instagram.maxMediaGroupSize, 10);
@@ -117,16 +117,15 @@ export function createInstagramHandler() {
       // Fallback to URL fixer (legacy behavior).
       if (tenant.settings.featureFlags.instagramFallbackFix) {
         const fixed = fixInstagramUrl(pathname, tenant.settings.instagram.fallbackFixDomain);
-        await ctx.api.sendMessage(tenant.chatId, `<b>${author}</b> posted:\n${fixed}`, { parse_mode: "HTML" }).catch(() => {});
+        await ctx.api.sendMessage(tenant.chatId, `<b>${author}</b> posted:\n${fixed}`, { parse_mode: "HTML" }).catch(() => { });
       } else {
-        await ctx.api.sendMessage(tenant.chatId, `Instagram download failed: ${errMsg}`).catch(() => {});
+        await ctx.api.sendMessage(tenant.chatId, `Instagram download failed: ${errMsg}`).catch(() => { });
       }
       if (progress) {
-        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => {});
+        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => { });
       }
     } finally {
       if (tempDir) await temp.removePath(tempDir);
     }
   };
 }
-
