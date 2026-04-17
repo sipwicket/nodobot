@@ -15,6 +15,7 @@
 
 - [Deno](https://deno.com/)
 - [ffmpeg](https://ffmpeg.org/) (required for WebM → MP4 conversion)
+- [Python 3](https://www.python.org/) with [Instaloader](https://github.com/instaloader/instaloader) on `PATH` (pinned in the Docker image as `instaloader==4.15.1`; required for native Instagram downloads)
 - A telegram bot token
   - You can get one by talking to [BotFather](https://t.me/botfather)
 
@@ -24,8 +25,8 @@
 2. Set the environment variable `TELEGRAM_TOKEN` to your bot token
    - Bash: `export TELEGRAM_TOKEN=<your token>`
    - PowerShell: `$env:TELEGRAM_TOKEN = "<your token>"`
-3. (Optional) Set Instagram cookies for higher success rate:
-   - `export INSTAGRAM_COOKIES="sessionid=...; csrftoken=...; ds_user_id=..."`
+3. (Optional) Configure Instaloader authentication for reliable Instagram downloads:
+   - Create a session once (see [Instaloader login](https://instaloader.github.io/basic-usage.html#login)), then set `INSTALOADER_LOGIN` and optionally `INSTALOADER_SESSION_FILE` (passed to Instaloader `-f`).
 4. Configure multitenancy placeholders:
    - **Subscription allowlist** (placeholder): `export ACTIVE_TENANTS="123456789,987654321"`
      - `TenantId` is the Telegram chat id (group id).
@@ -68,11 +69,11 @@
   - Duplicate link detection across YouTube/Twitter/TikTok/Instagram variants
   - Twitter/X embed rewriting to `fxtwitter.com`
   - TikTok embed rewriting to `fxtiktok.com`
-  - Instagram native download + progress message + fallback to `kksave.com` when rate-limited
+  - Instagram native download (Instaloader) + progress message + fallback to `kksave.com` on failure
   - `.webm` URL conversion to MP4 and original message deletion
   - Duplicate image detection (send same image twice)
   - `/help` output and direct-reply behavior
-- Monitor logs and resource usage; increase `instagram.minRequestIntervalMs` or disable Instagram download per tenant if needed.
+- Monitor logs and resource usage; disable Instagram download per tenant if Instaloader is unstable or too slow for your environment.
 - Cutover:
   - Deploy Deno bot alongside legacy bot (different bot token), or stop legacy and start Deno.
   - Keep rollback ready: stop Deno bot and restart legacy bot using the original Node entrypoint.

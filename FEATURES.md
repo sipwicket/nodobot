@@ -112,57 +112,35 @@ Identical in behavior to the Twitter fixer, but for TikTok URLs.
 
 ## 5. Instagram Media Downloading
 
-**Files:** `src/handlers/instagramHandler.ts`, `src/utils/instagramApi.ts`, `src/utils/instagramMedia.ts`, `src/utils/getInstagramId.ts`, `src/utils/downloadToBuffer.ts`, `src/utils/progressBar.ts`
+**Files:** [`apps/bot/src/handlers/instagramHandler.ts`](apps/bot/src/handlers/instagramHandler.ts), [`packages/integrations/src/instagram/instaloaderPostDownloader.ts`](packages/integrations/src/instagram/instaloaderPostDownloader.ts), [`packages/core/src/features/link/normalizers.ts`](packages/core/src/features/link/normalizers.ts), [`packages/shared/src/progressBar.ts`](packages/shared/src/progressBar.ts)
 
-The most complex feature. When a user posts an Instagram link, the bot attempts to **download the actual media** (photos and videos) from the post and send them directly into the Telegram chat as native media.
+When a user posts an Instagram link, the bot attempts to **download the actual media** (photos and videos) from the post using the **[Instaloader](https://github.com/instaloader/instaloader)** CLI and send them directly into the Telegram chat as native media.
 
 ### End-to-End Flow
 
 1. User posts an Instagram link (`instagram.com/p/...`, `/reel/...`, or `/reels/...`).
-2. Bot **deletes the original message** immediately.
-3. Bot sends a **progress message** with an ASCII progress bar (`[====                ] 20%`).
+2. Bot **deletes the original message** immediately (when configured).
+3. Bot may send a **progress message** with an ASCII progress bar.
 4. Extracts the **shortcode** from the URL pathname.
-5. Calls the Instagram GraphQL API to fetch media metadata (see API details below).
-6. Parses the API response to extract all media URLs (images and videos).
-7. Downloads each media item to a **temporary file on disk** using streaming (memory-efficient).
-8. Sends all media to the chat as a **Telegram media group** (album), with a caption like `**Author** posted: Instagram media (3 items)`.
-9. **Cleans up temporary files** after sending.
-10. **Deletes the progress message.**
+5. Runs **Instaloader** in a temporary directory with target `-- -{shortcode}` (see Instaloader docs).
+6. Collects produced image/video files under the post directory, sorted for stable carousel order.
+7. Sends all media to the chat as a **Telegram media group** (album), with a caption from the tenant template.
+8. **Cleans up the temporary directory** after sending (or on error).
 
-### Instagram API Integration
+### Instaloader integration
 
-- **Primary method:** GraphQL `query_hash` API (`2c4c2e343a8f64c625ba02b2aa12c7f8`).
-- **Fallback method:** GraphQL `query_id` API (`9496392173716084`) — used when the primary method returns a `fail` status.
-- Supports **authenticated requests** via `INSTAGRAM_COOKIES` environment variable (session cookies from browser).
-- Uses a **mobile User-Agent** to mimic the Instagram app.
+- **Runtime:** `instaloader` must be on `PATH` (Dockerfile installs `instaloader==4.15.1` globally).
+- **Authentication (recommended):** `INSTALOADER_LOGIN` maps to `--login`; optional `INSTALOADER_SESSION_FILE` maps to `-f` / `--sessionfile` for a non-default session path (see [Instaloader login](https://instaloader.github.io/basic-usage.html#login)).
+- **Override executable:** `INSTALOADER_CMD` (defaults to `instaloader`).
+- **Quiet / non-interactive:** Instaloader is invoked with `-q`; without a valid session, downloads may fail with login-related errors.
 
-### Rate Limit Handling
+### Media type support
 
-- Enforces a **minimum 2-second delay** between requests.
-- Implements **exponential backoff** on rate limit responses: retries after 1s, 2s, 5s, and 15s.
-- Sends **status updates** to the Telegram progress message during long waits.
-- On exhaustion of retries, reports the rate limit error and falls back to URL fixing (section 6).
+Instaloader writes JPEG/PNG/WebP and MP4 (and similar) to disk; the bot classifies extensions into Telegram **photo** vs **video** payloads. Carousels are represented as multiple files in one post folder; files are ordered lexicographically after a recursive directory walk.
 
-### Media Type Support
+### Fallback behavior
 
-| Media Type         | GraphQL (query_hash)             | Legacy (query_id)                |
-|--------------------|----------------------------------|----------------------------------|
-| Single Image       | `GraphImage` → `display_resources` (highest resolution) | `image_versions2.candidates` (sorted by quality) |
-| Single Video       | `GraphVideo` → `video_url`       | `video_versions[0].url`         |
-| Carousel (album)   | `GraphSidecar` → iterates `edge_sidecar_to_children` | `carousel_media[]` array        |
-
-### Memory Optimization
-
-- Downloads media to **temporary files** via Node.js streams (`pipeline`) instead of buffering entire files in memory.
-- Processes media items **one at a time** to minimize peak memory usage.
-- Sends in groups of up to **10 items** (Telegram media group limit).
-- Cleans up files **immediately** after each group is sent.
-
-### Fallback Behavior
-
-If media download fails for any reason, the bot:
-1. Sends an error message explaining the failure (with special messaging for rate limits).
-2. Falls back to **URL fixing** (replacing `instagram.com` with `kksave.com`).
+If Instaloader fails or produces no media files, the bot falls back to **URL fixing** (replacing `instagram.com` with `kksave.com`) when that feature is enabled.
 
 ---
 
@@ -328,7 +306,9 @@ The bot loads its configuration from a `config.json` file at startup. Configurat
 | Variable              | Required | Description                                                    |
 |-----------------------|----------|----------------------------------------------------------------|
 | `TELEGRAM_TOKEN`      | Yes      | Telegram Bot API token (from BotFather)                        |
-| `INSTAGRAM_COOKIES`   | No       | Instagram session cookies for authenticated API requests. Format: `sessionid=xxx; csrftoken=yyy; ds_user_id=zzz` |
+| `INSTALOADER_LOGIN`   | No       | Instagram username for Instaloader `--login` (use with a saved session for non-interactive runs) |
+| `INSTALOADER_SESSION_FILE` | No  | Path for Instaloader `-f` / `--sessionfile` (session key file)   |
+| `INSTALOADER_CMD`     | No       | Instaloader executable name or path (default: `instaloader`)    |
 
 ---
 
@@ -343,7 +323,7 @@ A thin wrapper around `console` methods providing four log levels:
 - `logger.warn()` → `console.warn()`
 - `logger.info()` → `console.info()`
 
-Additionally, the Instagram API module includes extensive inline logging for debugging API interactions, including request timing, retry attempts, and response summaries.
+The Instagram handler logs download triggers, Instaloader completion, batch sends, and failures for operational debugging.
 
 ---
 
@@ -431,13 +411,13 @@ nodobot/
         ├── getTwitterId.ts           # Twitter/X URL parser and fixer
         ├── getTiktokId.ts            # TikTok URL parser and fixer
         ├── getInstagramId.ts         # Instagram URL parser and fixer
-        ├── instagramApi.ts           # Instagram GraphQL API client with retry logic
-        ├── instagramMedia.ts         # Instagram media response parser
         ├── detectWebm.ts             # WebM URL detector
         ├── convertWebmToMp4.ts       # WebM→MP4 conversion via ffmpeg
         ├── getRandomImage.ts         # Random image API fetcher
         └── progressBar.ts            # ASCII progress bar generator
 ```
+
+In this monorepo, Instagram post downloads are implemented in [`packages/integrations/src/instagram/instaloaderPostDownloader.ts`](packages/integrations/src/instagram/instaloaderPostDownloader.ts) (the `src/` tree above is a simplified / partly historical view).
 
 ### Key Dependencies
 
@@ -473,7 +453,7 @@ This matrix lists every implemented runtime behavior in one place.
 | Text message containing URL entity | Telegram `entities` with `type === 'url'` | Normalize URL and check link cache | If duplicate: reply with original poster + time delta | Duplicate-link warning reply |
 | First-time Twitter/X URL (`x.com` / `twitter.com`) | Extract tweet ID + username; check not already fixer domain | Replace with `fxtwitter.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
 | First-time TikTok URL (`tiktok.com`) | Extract video ID + username; check not already fixer domain | Replace with `fxtiktok.com` URL | On send/delete failure: error reply | Better rich embed + original removed |
-| First-time Instagram URL | Extract pathname, shortcode, call Instagram API | Download media and resend as Telegram media group | On API/download failure: fallback to `kksave.com` URL replacement | Native Telegram media or fallback link |
+| First-time Instagram URL | Extract pathname, shortcode, run Instaloader CLI | Download media and resend as Telegram media group | On Instaloader failure: fallback to `kksave.com` URL replacement | Native Telegram media or fallback link |
 | Message text is only a `.webm` URL | Regex match (`isExclusiveWebmUrl`) | Download, transcode to MP4, resend video, delete original | Reply with conversion error and clean up temp files | Converted inline video appears in chat |
 | Photo message | Download Telegram photo + compute hash | Check image cache and store if new | If duplicate: send duplicate image warning with time ago | Duplicate-image warning reply |
 | `/help` command | Bot command handler | Print configured command IDs | N/A | Semicolon-separated command list |
@@ -513,35 +493,23 @@ This matrix lists every implemented runtime behavior in one place.
 
 ## 19. Instagram Downloader Internals (Deep Dive)
 
-### API Strategy
+### Instaloader invocation
 
-1. Try GraphQL endpoint with `query_hash`.
-2. If response includes `status: fail`, switch to fallback `query_id` endpoint.
-3. In both paths, classify and retry rate-limit errors with backoff.
+The integrations layer runs Instaloader with a dedicated working directory per request, for example:
 
-### Rate-Limit Policy
+- Quiet, non-interactive flags: `-q`, `--no-metadata-json`, `--no-compress-json`, `--no-captions`, `--no-video-thumbnails`, `--no-resume`, `--sanitize-paths`.
+- Post target: `--` then `-{shortcode}` (Instaloader’s single-post target syntax).
+- Output layout: `--dirname-pattern {target}` so each run writes under `workDir/-{shortcode}/`.
 
-- Global inter-request floor: **2 seconds**.
-- Retry delays: **1s -> 2s -> 5s -> 15s**.
-- Status callback updates in-chat progress text during long waits.
+### Session and reliability
 
-### Media Extraction Rules
+Instaloader’s behavior matches upstream documentation: logged-in sessions substantially improve success versus anonymous access. The bot does not embed Instagram GraphQL parsing logic; maintenance of scraping behavior tracks Instaloader releases.
 
-- GraphQL response:
-  - `GraphImage`: pick highest-resolution `display_resources` entry.
-  - `GraphVideo`: use `video_url`.
-  - `GraphSidecar`: walk all edges and collect mixed media.
-- Legacy response:
-  - `carousel_media`: iterate each item.
-  - `image_versions2.candidates`: sort quality and select preferred candidate.
-  - `video_versions`: select first available version.
+### Delivery strategy
 
-### Delivery Strategy
-
-- Download each media item to temp file (`downloadToFile`) to reduce RAM usage.
-- Batch-send with `replyWithMediaGroup` up to Telegram group size limits.
-- If group send fails, fallback to per-item send.
-- Delete temp files after each successful send cycle.
+- Collect media paths with a recursive directory walk, filter by extension, sort paths, then map to Telegram **photo** / **video** API payloads.
+- Batch-send with `sendMediaGroup` up to Telegram’s **10** item limit (also capped by tenant `instagram.maxMediaGroupSize`).
+- Delete the temp working directory in a `finally` block.
 
 ---
 
@@ -575,9 +543,10 @@ Because caches are volatile, historical duplicate detection is bounded by:
 
 ### Runtime Dependencies
 
-- Node.js runtime with ESM/TypeScript execution support.
-- FFmpeg installed and reachable by `fluent-ffmpeg` for WebM conversion.
-- Network access to Telegram APIs and remote media hosts.
+- Deno runtime (see repo `deno.json` tasks).
+- FFmpeg installed and reachable for WebM conversion.
+- Python 3 with **Instaloader** on `PATH` for native Instagram downloads (see Docker image).
+- Network access to Telegram APIs, Instagram, and remote media hosts.
 
 ### Startup Guarantees
 

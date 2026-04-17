@@ -9,7 +9,6 @@ export * from "./tenancy/subscriptionGate.ts";
 export * from "./features/link/urlExtract.ts";
 export * from "./features/link/normalizers.ts";
 export * from "./features/link/duplicateLinks.ts";
-export * from "./features/instagram/mediaExtract.ts";
 export * from "./features/webm/detectWebm.ts";
 export * from "./features/image/perceptualHash.ts";
 

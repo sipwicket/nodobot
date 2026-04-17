@@ -4,7 +4,12 @@ WORKDIR /app
 
 USER root
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+  && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    ca-certificates \
+    python3 \
+    python3-pip \
+  && pip3 install --no-cache-dir --break-system-packages instaloader==4.15.1 \
   && rm -rf /var/lib/apt/lists/*
 
 USER deno

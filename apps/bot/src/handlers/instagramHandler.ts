@@ -1,18 +1,12 @@
 import type { BotContext } from "../context.ts";
-import { DenoHttpDownloader, DenoTempFiles, InstagramClient } from "@integrations/mod.ts";
-import { extractInstagramMediaUrls } from "@core/features/instagram/mediaExtract.ts";
+import { DenoTempFiles, InstaloaderPostDownloader } from "@integrations/mod.ts";
 import { extractShortcode, getInstagramPathname, fixInstagramUrl } from "@core/features/link/normalizers.ts";
 import { generateProgressBar } from "@shared/progressBar.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
-function extForType(t: "video" | "image"): string {
-  return t === "video" ? "mp4" : "jpg";
-}
-
 export function createInstagramHandler() {
-  const downloader = new DenoHttpDownloader();
   const temp = new DenoTempFiles();
 
   return async function instagramHandler(ctx: BotContext) {
@@ -57,32 +51,28 @@ export function createInstagramHandler() {
       }
       : undefined;
 
-    const ig = new InstagramClient({
-      cookies: Deno.env.get("INSTAGRAM_COOKIES") ?? undefined,
-      minRequestIntervalMs: tenant.settings.instagram.minRequestIntervalMs,
-      retryBackoffMs: tenant.settings.instagram.retryBackoffMs,
+    const igDownloader = new InstaloaderPostDownloader({
+      command: Deno.env.get("INSTALOADER_CMD") ?? undefined,
+      login: Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
+      sessionFile: Deno.env.get("INSTALOADER_SESSION_FILE") ?? undefined,
     });
 
     let tempDir: string | null = null;
     try {
-      const apiResult = await ig.getBlobMedia(shortcode, reporter);
-      const media = extractInstagramMediaUrls(apiResult);
-      if (media.length === 0) throw new Error("instagram: no media items");
+      tempDir = await temp.createTempDir("nodobot-ig-");
+      if (reporter) await reporter(`${generateProgressBar(2, 5)} Downloading with Instaloader...`);
 
-      logger.debug("[instagramHandler] media metadata fetched", {
-        itemCount: media.length,
+      const downloaded = await igDownloader.downloadPost(shortcode, tempDir);
+      if (downloaded.length === 0) throw new Error("instagram: no media items");
+
+      logger.debug("[instagramHandler] Instaloader download finished", {
+        itemCount: downloaded.length,
       });
 
-      tempDir = await temp.createTempDir("nodobot-ig-");
-      if (reporter) await reporter(`${generateProgressBar(2, 5)} Downloading ${media.length} items...`);
-
-      const items: { kind: "image" | "video"; path: string; caption?: string }[] = [];
-      for (let i = 0; i < media.length; i++) {
-        const m = media[i];
-        const outPath = `${tempDir}/${String(i + 1).padStart(2, "0")}.${extForType(m.type)}`;
-        await downloader.downloadToFile(m.url, outPath);
-        items.push({ kind: m.type === "video" ? "video" : "image", path: outPath });
-      }
+      const items: { kind: "image" | "video"; path: string; caption?: string }[] = downloaded.map((d) => ({
+        kind: d.kind,
+        path: d.path,
+      }));
 
       const caption = renderTemplate(tenant.settings.instagram.postTemplate, { author, count: String(items.length) });
       // Remove progress before media so "Sending to chat..." never stays next to the album.
