@@ -55,8 +55,16 @@ export function createInstagramHandler() {
       command: Deno.env.get("INSTALOADER_CMD") ?? undefined,
       login: Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
       password: Deno.env.get("INSTALOADER_PASSWORD") ?? undefined,
-      sessionFile: Deno.env.get("INSTALOADER_SESSION_FILE") ?? undefined,
+      sessionFile: Deno.env.get("INSTALOADER_SESSION_FILE") ?? Deno.env.get("INSTALOADER_SESSIONFILE") ??
+        undefined,
     });
+
+    const sessionFileForInstaloader = igDownloader.resolvedSessionFile;
+    if (sessionFileForInstaloader !== undefined) {
+      logger.info("[instagramHandler] Instaloader using session file (--sessionfile)", {
+        sessionFile: sessionFileForInstaloader,
+      });
+    }
 
     let tempDir: string | null = null;
     try {

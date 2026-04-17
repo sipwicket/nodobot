@@ -10,6 +10,21 @@ export type InstaloaderPostDownloaderOpts = {
   maxConnectionAttempts?: number;
 };
 
+/** Expands a leading `~` so values like `~/.config/instaloader/session-USER` work when read from env (no shell expansion). */
+function expandUserPath(path: string): string {
+  if (path === "~") {
+    return Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE") ?? path;
+  }
+  if (path.startsWith("~/") || path.startsWith("~\\")) {
+    const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
+    if (!home) return path;
+    const rest = path.slice(2).replaceAll("\\", "/");
+    const base = home.replace(/[/\\]$/, "");
+    return `${base}/${rest}`;
+  }
+  return path;
+}
+
 const MEDIA_EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 const MEDIA_EXT_VIDEO = new Set([".mp4", ".webm"]);
 
@@ -76,8 +91,13 @@ export class InstaloaderPostDownloader {
     this.#command = opts.command ?? "instaloader";
     this.#login = opts.login;
     this.#password = opts.password;
-    this.#sessionFile = opts.sessionFile;
+    this.#sessionFile = opts.sessionFile ? expandUserPath(opts.sessionFile) : undefined;
     this.#maxConnectionAttempts = opts.maxConnectionAttempts ?? 5;
+  }
+
+  /** Absolute or expanded session key path passed to Instaloader `--sessionfile`, if configured. */
+  get resolvedSessionFile(): string | undefined {
+    return this.#sessionFile;
   }
 
   /**
@@ -90,7 +110,7 @@ export class InstaloaderPostDownloader {
 
     const args: string[] = [];
     if (this.#sessionFile) {
-      args.push("-f", this.#sessionFile);
+      args.push("--sessionfile", this.#sessionFile);
     }
     if (this.#login) {
       args.push("--login", this.#login);
