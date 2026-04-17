@@ -3,8 +3,7 @@
     "apps/bot",
     "packages/core",
     "packages/integrations",
-    "packages/shared",
-    "tests"
+    "packages/shared"
   ],
   "tasks": {
     "dev": "deno run -A --watch=apps/bot/src,packages --watch-exclude=apps/bot/tenant_overrides.json --watch-exclude='**/tenant_overrides.json' apps/bot/src/main.ts",
