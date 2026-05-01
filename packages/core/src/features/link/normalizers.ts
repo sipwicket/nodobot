@@ -1,6 +1,7 @@
 export const TWITTER_FIXER_DOMAINS = ["fxtwitter.com", "vxtwitter.com"] as const;
 export const TIKTOK_FIXER_DOMAINS = ['fxtiktok.com'] as const;
 export const INSTAGRAM_FIXER_DOMAINS = ['kksave.com'] as const;
+export const THREADS_FIXER_DOMAINS = [] as const;
 
 const TWITTER_DOMAINS = [
   'x.com',
@@ -12,6 +13,7 @@ const INSTAGRAM_DOMAINS = [
   'instagram.com',
   ...INSTAGRAM_FIXER_DOMAINS,
 ] as const;
+const THREADS_DOMAINS = ['threads.com', 'threads.net', ...THREADS_FIXER_DOMAINS] as const;
 
 export function getYoutubeId(url: string): string | undefined {
   return /(youtu.*be.*)\/(watch\?v=|embed\/|v|shorts|)(.*?((?=[&#?])|$))/g.exec(
@@ -70,8 +72,21 @@ export function getInstagramPathname(url: string): string | undefined {
   }
 }
 
+export function getThreadsPathname(url: string): string | undefined {
+  if (!THREADS_DOMAINS.some(d => url.includes(d))) return undefined;
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return undefined;
+  }
+}
+
 export function instagramUrlIsFixed(url: string): boolean {
   return INSTAGRAM_FIXER_DOMAINS.some(d => url.includes(d));
+}
+
+export function threadsUrlIsFixed(url: string): boolean {
+  return THREADS_FIXER_DOMAINS.some(d => url.includes(d));
 }
 
 export function fixInstagramUrl(
@@ -92,6 +107,16 @@ export function extractShortcode(pathname: string): string | null {
   return null;
 }
 
+export function extractThreadsPostCode(pathname: string): string | null {
+  if (!pathname) return null;
+  const cleanPath = pathname.replace(/^\/|\/$/g, "");
+  const postMatch = cleanPath.match(/^@[^\/]+\/post\/([^\/]+)/i);
+  if (postMatch) return postMatch[1];
+  const shortPathMatch = cleanPath.match(/^t\/([^\/]+)/i);
+  if (shortPathMatch) return shortPathMatch[1];
+  return null;
+}
+
 export function normalizeLinkKey(url: string): string {
   const yt = getYoutubeId(url);
   if (yt) return `YOUTUBE-${yt}`;
@@ -101,6 +126,7 @@ export function normalizeLinkKey(url: string): string {
   if (tk) return `TIKTOK-${tk}`;
   const igPath = getInstagramPathname(url);
   if (igPath) return `INSTAGRAM-${igPath}`;
+  const threadsPath = getThreadsPathname(url);
+  if (threadsPath) return `THREADS-${threadsPath}`;
   return url;
 }
-

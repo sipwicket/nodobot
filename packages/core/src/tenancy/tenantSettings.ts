@@ -6,6 +6,7 @@ export type TenantSettingsV1 = {
     tiktokFix: boolean;
     instagramDownload: boolean;
     instagramFallbackFix: boolean;
+    threadsDownload: boolean;
     duplicateImages: boolean;
     webmConversion: boolean;
     directReply: boolean;
@@ -36,6 +37,15 @@ export type TenantSettingsV1 = {
   instagram: {
     preferNativeDownload: boolean;
     fallbackFixDomain: 'kksave.com';
+    minRequestIntervalMs: number;
+    retryBackoffMs: [number, number, number, number];
+    progressUpdates: boolean;
+    maxMediaGroupSize: number;
+    deleteOriginalMessage: boolean;
+    postTemplate: string;
+  };
+  threads: {
+    preferNativeDownload: boolean;
     minRequestIntervalMs: number;
     retryBackoffMs: [number, number, number, number];
     progressUpdates: boolean;
@@ -86,6 +96,7 @@ export function defaultTenantSettingsV1(): TenantSettingsV1 {
       tiktokFix: true,
       instagramDownload: true,
       instagramFallbackFix: true,
+      threadsDownload: true,
       duplicateImages: true,
       webmConversion: true,
       directReply: false,
@@ -122,6 +133,15 @@ export function defaultTenantSettingsV1(): TenantSettingsV1 {
       maxMediaGroupSize: 10,
       deleteOriginalMessage: true,
       postTemplate: '<b>{author}</b> posted: Instagram media ({count} items)',
+    },
+    threads: {
+      preferNativeDownload: true,
+      minRequestIntervalMs: 2000,
+      retryBackoffMs: [1000, 2000, 5000, 15000],
+      progressUpdates: true,
+      maxMediaGroupSize: 10,
+      deleteOriginalMessage: true,
+      postTemplate: '<b>{author}</b> posted: Threads media ({count} items)',
     },
     webmConversion: {
       mode: 'standard',
@@ -292,6 +312,30 @@ export function validateTenantSettingsV1(input: unknown): TenantSettingsV1 {
     requireNumber(
       merged.instagram.maxMediaGroupSize,
       "instagram.maxMediaGroupSize",
+    ),
+    1,
+    10,
+  );
+
+  merged.threads.minRequestIntervalMs = clamp(
+    requireNumber(
+      merged.threads.minRequestIntervalMs,
+      "threads.minRequestIntervalMs",
+    ),
+    500,
+    10_000,
+  );
+  if (
+    !Array.isArray(merged.threads.retryBackoffMs) ||
+    merged.threads.retryBackoffMs.length !== 4 ||
+    merged.threads.retryBackoffMs.some((n) => typeof n !== "number")
+  ) {
+    throw new Error("Invalid threads.retryBackoffMs");
+  }
+  merged.threads.maxMediaGroupSize = clamp(
+    requireNumber(
+      merged.threads.maxMediaGroupSize,
+      "threads.maxMediaGroupSize",
     ),
     1,
     10,

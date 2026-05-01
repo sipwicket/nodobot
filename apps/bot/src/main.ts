@@ -16,6 +16,7 @@ import {
 import { InMemoryLinkCache } from "@integrations/cache/inMemoryCaches.ts";
 import { createEntityHandler } from "./handlers/entityHandler.ts";
 import { createInstagramHandler } from "./handlers/instagramHandler.ts";
+import { createThreadsHandler } from "./handlers/threadsHandler.ts";
 import { createWebmHandler } from "./handlers/webmHandler.ts";
 import { InMemoryImageCache } from "@integrations/cache/inMemoryCaches.ts";
 import { createImageHandler } from "./handlers/imageHandler.ts";
@@ -104,6 +105,10 @@ bot.on(
 bot.on(
   "message:text",
   chainMessageHandler("instagramHandler", createInstagramHandler()),
+);
+bot.on(
+  "message:text",
+  chainMessageHandler("threadsHandler", createThreadsHandler()),
 );
 bot.on("message:text", chainMessageHandler("webmHandler", createWebmHandler()));
 bot.on(

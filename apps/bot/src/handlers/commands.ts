@@ -29,6 +29,8 @@ const FEATURE_FLAG_DESCRIPTIONS: Record<FeatureFlagName, string> = {
     "Turns on Instagram link processing (download and repost media per your Instagram config).",
   instagramFallbackFix:
     "Rewrites Instagram links to your fallback fixer when native download is not used first (IG download off or not preferred).",
+  threadsDownload:
+    "Turns on Threads link processing (download and repost media for public Threads posts).",
   webmConversion:
     "Converts incoming WebM videos to a format that plays smoothly in Telegram.",
   directReply:

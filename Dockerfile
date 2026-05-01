@@ -2,6 +2,8 @@ FROM denoland/deno:2.4.5
 
 WORKDIR /app
 
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 USER root
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -10,6 +12,8 @@ RUN apt-get update \
     python3 \
     python3-pip \
   && pip3 install --no-cache-dir --break-system-packages instaloader==4.15.1 \
+  && deno run -A npm:playwright install --with-deps chromium \
+  && chown -R deno:deno /ms-playwright \
   && rm -rf /var/lib/apt/lists/*
 
 USER deno
