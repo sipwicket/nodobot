@@ -7,6 +7,15 @@ import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 async function inspectDownloadedMedia(path: string) {
   try {
     const stat = await Deno.stat(path);
@@ -103,6 +112,11 @@ export function createThreadsHandler() {
       if (reporter) await reporter(`${generateProgressBar(2, progressTotal)} Preparing to download...`);
       tempDir = await temp.createTempDir("nodobot-threads-");
 
+      const postText = await downloader.extractPostText(url).catch((error) => {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        logger.debug("[threadsHandler] failed to extract Threads post text", { error: errMsg, url });
+        return null;
+      });
 
       logger.info("[threadsHandler] starting media download", { url, tempDir });
       const downloaded = await downloader.downloadPostMedia(url, tempDir, {
@@ -141,10 +155,16 @@ export function createThreadsHandler() {
       if (downloaded.length === 0) throw new Error("threads: no media items");
       if (reporter) await reporter(`${generateProgressBar(9.5, progressTotal)} Uploading...`);
 
-      const caption = renderTemplate(tenant.settings.threads.postTemplate, {
+      const escapedPostText = postText ? escapeHtml(postText) : "";
+      const template = tenant.settings.threads.postTemplate;
+      const renderedCaption = renderTemplate(template, {
         author,
         count: String(downloaded.length),
+        text: escapedPostText,
       });
+      const caption = escapedPostText && !template.includes("{text}")
+        ? `${renderedCaption}\n\n${escapedPostText}`
+        : renderedCaption;
 
       const batchSize = Math.min(tenant.settings.threads.maxMediaGroupSize, 10);
       logger.info("[threadsHandler] sending media groups", {

@@ -210,6 +210,43 @@ function decodeEscapedUrl(raw: string): string {
     .replace(/\\"/g, '"');
 }
 
+function decodeHtmlEntities(raw: string): string {
+  return raw
+    .replaceAll("&nbsp;", " ")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replace(/&#(\d+);/g, (_, n: string) => {
+      const codePoint = Number.parseInt(n, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : "";
+    });
+}
+
+function normalizeExtractedText(raw: string): string {
+  return raw
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function extractPageletTextFromHtml(html: string, sourceUrl: string): string | null {
+  const scopedHtml = pickScopedHtml(html, sourceUrl);
+  const withoutScripts = scopedHtml
+    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
+  const withBlockBreaks = withoutScripts
+    .replace(/<(?:br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, "\n");
+  const stripped = withBlockBreaks.replace(/<[^>]+>/g, " ");
+  const decoded = decodeHtmlEntities(stripped);
+  const normalized = normalizeExtractedText(decoded);
+  return normalized.length > 0 ? normalized : null;
+}
+
 async function removeIfExists(path: string): Promise<void> {
   await Deno.remove(path).catch(() => { });
 }
@@ -627,6 +664,11 @@ export class ThreadsPostDownloader {
         return { url: candidate, kind };
       })
       .filter((item): item is { url: string; kind: MediaKind } => item !== null);
+  }
+
+  async extractPostText(url: string): Promise<string | null> {
+    const html = await this.#fetchHtml(url);
+    return extractPageletTextFromHtml(html, url);
   }
 
   async downloadPostMedia(
