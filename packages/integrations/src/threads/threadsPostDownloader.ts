@@ -608,6 +608,56 @@ export class ThreadsPostDownloader {
     return [...videos, ...images];
   }
 
+  async #extractPostTextFromBrowser(url: string): Promise<string | null> {
+    let browser: any;
+    try {
+      const { chromium } = await import("npm:playwright");
+      const executablePath = await discoverPlaywrightChromiumPath();
+      const launchAttempts: Array<Record<string, unknown>> = [];
+      if (executablePath) launchAttempts.push({ executablePath });
+      launchAttempts.push({ channel: "chrome" });
+      if (Deno.build.os === "windows") launchAttempts.push({ channel: "msedge" });
+      launchAttempts.push({});
+
+      let launchError: unknown;
+      for (const attempt of launchAttempts) {
+        try {
+          browser = await chromium.launch({
+            headless: true,
+            args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+            ...attempt,
+          });
+          break;
+        } catch (err) {
+          launchError = err;
+        }
+      }
+      if (!browser) throw launchError instanceof Error ? launchError : new Error("Unable to launch Chromium");
+
+      const page = await browser.newPage({
+        userAgent: this.#userAgent,
+      });
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: this.#requestTimeoutMs });
+      await page.waitForTimeout(4_000);
+
+      const text = await page.evaluate(() => {
+        const root = document.querySelector('[data-pagelet="threads_post_page_0"]') as HTMLElement | null;
+        return root?.innerText ?? null;
+      });
+      const normalizedText = text ? normalizeExtractedText(text) : "";
+      if (normalizedText) return normalizedText;
+
+      const hydratedHtml = await page.content();
+      return extractPageletTextFromHtml(hydratedHtml, url);
+    } finally {
+      try {
+        await browser?.close();
+      } catch {
+        // Ignore browser shutdown errors in fallback path.
+      }
+    }
+  }
+
   async #pickCandidates(
     url: string,
     report?: (
@@ -667,6 +717,14 @@ export class ThreadsPostDownloader {
   }
 
   async extractPostText(url: string): Promise<string | null> {
+    if (this.#enableBrowserFallback) {
+      try {
+        const browserText = await this.#extractPostTextFromBrowser(url);
+        if (browserText) return browserText;
+      } catch {
+        // Fall through to static extraction when browser extraction fails.
+      }
+    }
     const html = await this.#fetchHtml(url);
     return extractPageletTextFromHtml(html, url);
   }
