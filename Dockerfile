@@ -12,6 +12,8 @@ RUN apt-get update \
   python3 \
   python3-pip \
   && pip3 install --no-cache-dir --break-system-packages gallery-dl \
+  && printf '%s\n' '#!/bin/sh' 'exec python3 -m gallery_dl "$@"' > /usr/local/bin/gallery-dl \
+  && chmod +x /usr/local/bin/gallery-dl \
   && deno run -A npm:playwright install --with-deps chromium \
   && chown -R deno:deno /ms-playwright  \
   && chown -R deno:deno /ms-playwright /deno-dir \

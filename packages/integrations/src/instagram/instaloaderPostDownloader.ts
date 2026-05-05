@@ -122,7 +122,16 @@ export class InstaloaderPostDownloader {
       stdin: "null",
     });
 
-    const { code, stderr } = await cmd.output();
+    let code: number;
+    let stderr: Uint8Array;
+    try {
+      const out = await cmd.output();
+      code = out.code;
+      stderr = out.stderr;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`gallery-dl executable not available ('${this.#command}'): ${msg}`);
+    }
     const errText = decodeErr(stderr);
 
     const media = await collectMediaUnder(postDir);
