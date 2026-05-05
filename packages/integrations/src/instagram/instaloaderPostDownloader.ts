@@ -1,12 +1,8 @@
 export type InstaloaderPostDownloaderOpts = {
-  /** Executable name or path (default `instaloader`). */
+  /** Executable name or path (default `gallery-dl`). */
   command?: string;
-  /** Instagram username for `--login` (uses Instaloader session file). */
-  login?: string;
-  /** Instagram password for `--password` (non-interactive login; use with `--login`). */
-  password?: string;
-  /** Path passed to Instaloader `-f` / `--sessionfile` (load/store session). */
-  sessionFile?: string;
+  /** Path to cookies file passed to `gallery-dl --cookies` (e.g. `cookies.txt`). */
+  cookiesFile?: string;
   maxConnectionAttempts?: number;
 };
 
@@ -78,26 +74,22 @@ function decodeErr(bytes: Uint8Array, max = 4000): string {
 
 /**
  * Downloads one Instagram post (by shortcode) into a subdirectory of `workDir`
- * using the Instaloader CLI, then returns ordered media file paths.
+ * using `gallery-dl`, then returns ordered media file paths.
  */
 export class InstaloaderPostDownloader {
   #command: string;
-  #login?: string;
-  #password?: string;
-  #sessionFile?: string;
+  #cookiesFile?: string;
   #maxConnectionAttempts: number;
 
   constructor(opts: InstaloaderPostDownloaderOpts = {}) {
-    this.#command = opts.command ?? "instaloader";
-    this.#login = opts.login;
-    this.#password = opts.password;
-    this.#sessionFile = opts.sessionFile ? expandUserPath(opts.sessionFile) : undefined;
+    this.#command = opts.command ?? "gallery-dl";
+    this.#cookiesFile = opts.cookiesFile ? expandUserPath(opts.cookiesFile) : undefined;
     this.#maxConnectionAttempts = opts.maxConnectionAttempts ?? 5;
   }
 
-  /** Absolute or expanded session key path passed to Instaloader `--sessionfile`, if configured. */
-  get resolvedSessionFile(): string | undefined {
-    return this.#sessionFile;
+  /** Absolute or expanded cookies path passed to `gallery-dl --cookies`, if configured. */
+  get resolvedCookiesFile(): string | undefined {
+    return this.#cookiesFile;
   }
 
   /**
@@ -105,33 +97,21 @@ export class InstaloaderPostDownloader {
    * @param workDir Empty directory used as Instaloader working directory (caller-owned).
    */
   async downloadPost(shortcode: string, workDir: string): Promise<{ path: string; kind: "image" | "video" }[]> {
-    const target = `-${shortcode}`;
+    const target = shortcode.trim();
     const postDir = `${workDir}/${target}`;
+    const postUrl = `https://www.instagram.com/p/${target}/`;
 
     const args: string[] = [];
-    if (this.#sessionFile) {
-      args.push("--sessionfile", this.#sessionFile);
-    }
-    if (this.#login) {
-      args.push("--login", this.#login);
-    }
-    if (this.#password) {
-      args.push("--password", this.#password);
+    if (this.#cookiesFile) {
+      args.push("--cookies", this.#cookiesFile);
     }
     args.push(
-      "-q",
-      "--no-metadata-json",
-      "--no-compress-json",
-      "--no-captions",
-      "--no-video-thumbnails",
-      "--no-resume",
-      "--sanitize-paths",
-      "--max-connection-attempts",
+      "--quiet",
+      "--directory",
+      postDir,
+      "--retries",
       String(this.#maxConnectionAttempts),
-      "--dirname-pattern",
-      "{target}",
-      "--",
-      target,
+      postUrl,
     );
 
     const cmd = new Deno.Command(this.#command, {
@@ -150,11 +130,11 @@ export class InstaloaderPostDownloader {
 
     if (code !== 0) {
       throw new Error(
-        errText ? `instaloader failed (${code}): ${errText}` : `instaloader failed with exit code ${code}`,
+        errText ? `gallery-dl failed (${code}): ${errText}` : `gallery-dl failed with exit code ${code}`,
       );
     }
     throw new Error(
-      errText ? `instaloader: no media files produced. ${errText}` : "instaloader: no media files produced",
+      errText ? `gallery-dl: no media files produced. ${errText}` : "gallery-dl: no media files produced",
     );
   }
 }

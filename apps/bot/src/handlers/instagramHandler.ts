@@ -52,17 +52,15 @@ export function createInstagramHandler() {
       : undefined;
 
     const igDownloader = new InstaloaderPostDownloader({
-      command: Deno.env.get("INSTALOADER_CMD") ?? undefined,
-      login: Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
-      password: Deno.env.get("INSTALOADER_PASSWORD") ?? undefined,
-      sessionFile: Deno.env.get("INSTALOADER_SESSION_FILE") ?? Deno.env.get("INSTALOADER_SESSIONFILE") ??
-        undefined,
+      command: Deno.env.get("GALLERY_DL_CMD") ?? Deno.env.get("INSTALOADER_CMD") ?? undefined,
+      cookiesFile: Deno.env.get("INSTAGRAM_COOKIES_FILE") ?? Deno.env.get("GALLERY_DL_COOKIES_FILE") ??
+        Deno.env.get("COOKIES_FILE") ?? "cookies.txt",
     });
 
-    const sessionFileForInstaloader = igDownloader.resolvedSessionFile;
-    if (sessionFileForInstaloader !== undefined) {
-      logger.info("[instagramHandler] Instaloader using session file (--sessionfile)", {
-        sessionFile: sessionFileForInstaloader,
+    const cookiesFileForGalleryDl = igDownloader.resolvedCookiesFile;
+    if (cookiesFileForGalleryDl !== undefined) {
+      logger.info("[instagramHandler] gallery-dl using cookies file (--cookies)", {
+        cookiesFile: cookiesFileForGalleryDl,
       });
     }
 
@@ -74,7 +72,7 @@ export function createInstagramHandler() {
       const downloaded = await igDownloader.downloadPost(shortcode, tempDir);
       if (downloaded.length === 0) throw new Error("instagram: no media items");
 
-      logger.debug("[instagramHandler] Instaloader download finished", {
+      logger.debug("[instagramHandler] gallery-dl download finished", {
         itemCount: downloaded.length,
       });
 
