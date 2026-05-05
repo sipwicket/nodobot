@@ -11,7 +11,7 @@ RUN apt-get update \
   ca-certificates \
   python3 \
   python3-pip \
-  && pip3 install --no-cache-dir --break-system-packages instaloader==4.15.1 \
+  && pip3 install --no-cache-dir --break-system-packages gallery-dl \
   && deno run -A npm:playwright install --with-deps chromium \
   && chown -R deno:deno /ms-playwright  \
   && chown -R deno:deno /ms-playwright /deno-dir \
