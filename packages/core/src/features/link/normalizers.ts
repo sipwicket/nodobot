@@ -1,6 +1,6 @@
 export const TWITTER_FIXER_DOMAINS = ["fxtwitter.com", "vxtwitter.com"] as const;
 export const TIKTOK_FIXER_DOMAINS = ['fxtiktok.com'] as const;
-export const INSTAGRAM_FIXER_DOMAINS = ['kksave.com'] as const;
+export const INSTAGRAM_FIXER_DOMAINS = ['instagram.com'] as const;
 export const THREADS_FIXER_DOMAINS = [] as const;
 
 const TWITTER_DOMAINS = [
@@ -11,7 +11,6 @@ const TWITTER_DOMAINS = [
 const TIKTOK_DOMAINS = ['tiktok.com', ...TIKTOK_FIXER_DOMAINS] as const;
 const INSTAGRAM_DOMAINS = [
   'instagram.com',
-  ...INSTAGRAM_FIXER_DOMAINS,
 ] as const;
 const THREADS_DOMAINS = ['threads.com', 'threads.net', ...THREADS_FIXER_DOMAINS] as const;
 
