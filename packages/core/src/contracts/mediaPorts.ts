@@ -22,31 +22,62 @@ export interface HttpDownloadPort {
   downloadToBytes(url: string): Promise<Uint8Array>;
 }
 
+export type FfmpegPreset =
+  | "ultrafast"
+  | "superfast"
+  | "veryfast"
+  | "faster"
+  | "fast"
+  | "medium"
+  | "slow"
+  | "slower"
+  | "veryslow";
+
 export interface TranscoderPort {
   webmToMp4(
     inputPath: string,
     outputPath: string,
     opts: {
-      mode: "standard" | "ultraFast";
       crf: number;
       audioBitrateKbps: number;
-      ffmpegPreset: "ultrafast";
+      ffmpegPreset: FfmpegPreset;
     },
   ): Promise<void>;
 }
 
 export interface TelegramActionsPort {
   deleteMessage(chatId: string, messageId: number): Promise<void>;
-  replyText(chatId: string, replyToMessageId: number | undefined, text: string, opts?: {
-    parseMode?: "HTML" | "MarkdownV2";
-    disableWebPreview?: boolean;
-  }): Promise<void>;
-  sendText(chatId: string, text: string, opts?: { parseMode?: "HTML" | "MarkdownV2"; disableWebPreview?: boolean }): Promise<void>;
-  sendVideo(chatId: string, videoPath: string, opts?: { caption?: string; parseMode?: "HTML" | "MarkdownV2" }): Promise<void>;
-  sendPhoto(chatId: string, photoBytes: Uint8Array, opts?: { caption?: string; parseMode?: "HTML" | "MarkdownV2" }): Promise<void>;
+  replyText(
+    chatId: string,
+    replyToMessageId: number | undefined,
+    text: string,
+    opts?: {
+      parseMode?: "HTML" | "MarkdownV2";
+      disableWebPreview?: boolean;
+    },
+  ): Promise<void>;
+  sendText(
+    chatId: string,
+    text: string,
+    opts?: { parseMode?: "HTML" | "MarkdownV2"; disableWebPreview?: boolean },
+  ): Promise<void>;
+  sendVideo(
+    chatId: string,
+    videoPath: string,
+    opts?: { caption?: string; parseMode?: "HTML" | "MarkdownV2" },
+  ): Promise<void>;
+  sendPhoto(
+    chatId: string,
+    photoBytes: Uint8Array,
+    opts?: { caption?: string; parseMode?: "HTML" | "MarkdownV2" },
+  ): Promise<void>;
   sendMediaGroup(chatId: string, items: MediaItem[]): Promise<void>;
-  editText(chatId: string, messageId: number, text: string, opts?: { parseMode?: "HTML" | "MarkdownV2" }): Promise<void>;
+  editText(
+    chatId: string,
+    messageId: number,
+    text: string,
+    opts?: { parseMode?: "HTML" | "MarkdownV2" },
+  ): Promise<void>;
 }
 
 export type TenantScoped = { tenantId: TenantId };
-

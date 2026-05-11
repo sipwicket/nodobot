@@ -4,52 +4,55 @@ export class FfmpegTranscoder implements TranscoderPort {
   async webmToMp4(
     inputPath: string,
     outputPath: string,
-    opts: { mode: "standard" | "ultraFast"; crf: number; audioBitrateKbps: number; ffmpegPreset: "ultrafast" },
+    opts: { crf: number; audioBitrateKbps: number; ffmpegPreset: string },
   ): Promise<void> {
-    const baseArgs = ["-y", "-i", inputPath];
-    const videoArgs = ["-c:v", "libx264", "-preset", opts.ffmpegPreset, "-crf", String(opts.crf), "-tune", "fastdecode"];
-
-    const audioArgs = opts.mode === "ultraFast"
-      ? ["-c:a", "copy"]
-      : ["-c:a", "aac", "-b:a", `${opts.audioBitrateKbps}k`];
-
     const args = [
-      ...baseArgs,
-      ...videoArgs,
-      ...audioArgs,
+      "-y",
+      "-i",
+      inputPath,
+      // Prevents "Too many packets buffered for output stream" on high-res input
+      "-max_muxing_queue_size",
+      "9999",
+      // ── Video ────────────────────────────────────────────────────────────────
+      "-c:v",
+      "libx264",
+      "-crf",
+      String(opts.crf),
+      // Hard cap on peak bitrate – avoids crashes on modest connections
+      "-maxrate",
+      "4.5M",
+      "-preset",
+      opts.ffmpegPreset,
+      // Embeds global metadata required by some players
+      "-flags",
+      "+global_header",
+      // Broadest device compatibility (older Android / iOS)
+      "-pix_fmt",
+      "yuv420p",
+      "-profile:v",
+      "baseline",
+      // Moves the moov atom to the front for instant playback / streaming
       "-movflags",
       "+faststart",
-      "-threads",
-      "0",
+      // ── Audio ────────────────────────────────────────────────────────────────
+      // aac is the only codec Telegram accepts; ac 2 = stereo max
+      "-c:a",
+      "aac",
+      "-ac",
+      "2",
+      "-b:a",
+      `${opts.audioBitrateKbps}k`,
       outputPath,
     ];
 
-    const cmd = new Deno.Command("ffmpeg", { args, stdout: "null", stderr: "piped" });
+    const cmd = new Deno.Command("ffmpeg", {
+      args,
+      stdout: "null",
+      stderr: "piped",
+    });
     const { code, stderr } = await cmd.output();
-    if (code === 0) return;
-
-    // If ultraFast audio copy fails, retry with re-encode (legacy behavior).
-    if (opts.mode === "ultraFast") {
-      const retryArgs = [
-        ...baseArgs,
-        ...videoArgs,
-        "-c:a",
-        "aac",
-        "-b:a",
-        `${opts.audioBitrateKbps}k`,
-        "-movflags",
-        "+faststart",
-        "-threads",
-        "0",
-        outputPath,
-      ];
-      const retry = new Deno.Command("ffmpeg", { args: retryArgs, stdout: "null", stderr: "piped" });
-      const retryOut = await retry.output();
-      if (retryOut.code === 0) return;
-      throw new Error(new TextDecoder().decode(retryOut.stderr));
+    if (code !== 0) {
+      throw new Error(new TextDecoder().decode(stderr));
     }
-
-    throw new Error(new TextDecoder().decode(stderr));
   }
 }
-
