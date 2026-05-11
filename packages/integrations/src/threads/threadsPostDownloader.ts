@@ -21,7 +21,13 @@ function mediaKindForUrl(url: string): MediaKind | null {
   if (VIDEO_EXT.has(ext)) return "video";
   if (IMAGE_EXT.has(ext)) return "image";
   if (url.includes(".mp4")) return "video";
-  if (url.includes(".jpg") || url.includes(".jpeg") || url.includes(".png") || url.includes(".webp")) return "image";
+  if (
+    url.includes(".jpg") ||
+    url.includes(".jpeg") ||
+    url.includes(".png") ||
+    url.includes(".webp")
+  )
+    return "image";
   return null;
 }
 
@@ -129,7 +135,10 @@ function candidateScore(url: string, kind: MediaKind): number {
   return videoCandidateScore(url);
 }
 
-function pickBestCandidate(urls: Iterable<string>, kind: MediaKind): string | null {
+function pickBestCandidate(
+  urls: Iterable<string>,
+  kind: MediaKind,
+): string | null {
   let best: string | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;
   for (const url of urls) {
@@ -144,7 +153,8 @@ function pickBestCandidate(urls: Iterable<string>, kind: MediaKind): string | nu
 }
 
 function bestUrlFromSrcset(srcset: string, kind: MediaKind): string | null {
-  const ranked: Array<{ url: string; descriptorScore: number; score: number }> = [];
+  const ranked: Array<{ url: string; descriptorScore: number; score: number }> =
+    [];
   for (const token of srcset.split(",")) {
     const parts = token.trim().split(/\s+/).filter(Boolean);
     const url = parts[0];
@@ -155,7 +165,9 @@ function bestUrlFromSrcset(srcset: string, kind: MediaKind): string | null {
     if (/^\d+w$/.test(descriptor)) {
       descriptorScore = Number.parseInt(descriptor.slice(0, -1), 10);
     } else if (/^\d+(\.\d+)?x$/.test(descriptor)) {
-      descriptorScore = Math.floor(Number.parseFloat(descriptor.slice(0, -1)) * 1_000);
+      descriptorScore = Math.floor(
+        Number.parseFloat(descriptor.slice(0, -1)) * 1_000,
+      );
     }
 
     ranked.push({
@@ -168,14 +180,18 @@ function bestUrlFromSrcset(srcset: string, kind: MediaKind): string | null {
   if (ranked.length === 0) return null;
   // In srcset, the descriptor is the most reliable signal for resolution.
   ranked.sort((a, b) => {
-    if (b.descriptorScore !== a.descriptorScore) return b.descriptorScore - a.descriptorScore;
+    if (b.descriptorScore !== a.descriptorScore)
+      return b.descriptorScore - a.descriptorScore;
     return b.score - a.score;
   });
   return ranked[0]?.url ?? null;
 }
 
 function dedupeCandidatesByIdentity(urls: string[]): string[] {
-  const bestByKey = new Map<string, { url: string; kind: MediaKind; score: number }>();
+  const bestByKey = new Map<
+    string,
+    { url: string; kind: MediaKind; score: number }
+  >();
   for (const candidate of urls) {
     const kind = mediaKindForUrl(candidate);
     if (!kind) continue;
@@ -187,14 +203,19 @@ function dedupeCandidatesByIdentity(urls: string[]): string[] {
     }
   }
   const ranked = Array.from(bestByKey.values());
-  const videos = ranked.filter((entry) => entry.kind === "video").map((entry) => entry.url);
-  const images = ranked.filter((entry) => entry.kind === "image").map((entry) => entry.url);
+  const videos = ranked
+    .filter((entry) => entry.kind === "video")
+    .map((entry) => entry.url);
+  const images = ranked
+    .filter((entry) => entry.kind === "image")
+    .map((entry) => entry.url);
   return [...videos, ...images];
 }
 
 function sanitizeDecodedUrl(url: string): string | null {
   const trimmed = url.trim();
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) return null;
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://"))
+    return null;
   if (trimmed.includes("threads.net/embed.js")) return null;
   return trimmed;
 }
@@ -234,13 +255,18 @@ function normalizeExtractedText(raw: string): string {
     .trim();
 }
 
-function extractPageletTextFromHtml(html: string, sourceUrl: string): string | null {
+function extractPageletTextFromHtml(
+  html: string,
+  sourceUrl: string,
+): string | null {
   const scopedHtml = pickScopedHtml(html, sourceUrl);
   const withoutScripts = scopedHtml
     .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[\s\S]*?<\/style>/gi, " ");
-  const withBlockBreaks = withoutScripts
-    .replace(/<(?:br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi, "\n");
+  const withBlockBreaks = withoutScripts.replace(
+    /<(?:br|\/p|\/div|\/li|\/h[1-6])\b[^>]*>/gi,
+    "\n",
+  );
   const stripped = withBlockBreaks.replace(/<[^>]+>/g, " ");
   const decoded = decodeHtmlEntities(stripped);
   const normalized = normalizeExtractedText(decoded);
@@ -248,7 +274,7 @@ function extractPageletTextFromHtml(html: string, sourceUrl: string): string | n
 }
 
 async function removeIfExists(path: string): Promise<void> {
-  await Deno.remove(path).catch(() => { });
+  await Deno.remove(path).catch(() => {});
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -261,21 +287,24 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 async function discoverPlaywrightChromiumPath(): Promise<string | undefined> {
-  const configured = Deno.env.get("THREADS_CHROMIUM_PATH") ??
+  const configured =
+    Deno.env.get("THREADS_CHROMIUM_PATH") ??
     Deno.env.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH");
-  if (configured && await fileExists(configured)) return configured;
+  if (configured && (await fileExists(configured))) return configured;
 
   const os = Deno.build.os;
   const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE") ?? "";
   const localAppData = Deno.env.get("LOCALAPPDATA") ?? "";
 
-  const roots = os === "windows"
-    ? [`${localAppData}\\ms-playwright`]
-    : [`${home}/.cache/ms-playwright`, "/ms-playwright"];
+  const roots =
+    os === "windows"
+      ? [`${localAppData}\\ms-playwright`]
+      : [`${home}/.cache/ms-playwright`, "/ms-playwright"];
 
-  const relCandidates = os === "windows"
-    ? ["chrome-win64\\chrome.exe"]
-    : ["chrome-linux/chrome", "chrome-linux/headless_shell"];
+  const relCandidates =
+    os === "windows"
+      ? ["chrome-win64\\chrome.exe"]
+      : ["chrome-linux/chrome", "chrome-linux/headless_shell"];
 
   for (const root of roots) {
     if (!root) continue;
@@ -301,11 +330,19 @@ async function discoverChromiumPathInRoot(
 
   const chromiumDirs = entries
     .filter((entry) => entry.isDirectory && entry.name.startsWith("chromium-"))
-    .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" }));
+    .sort((a, b) =>
+      b.name.localeCompare(a.name, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
 
   for (const dir of chromiumDirs) {
     for (const rel of relCandidates) {
-      const candidate = `${root}/${dir.name}/${rel}`.replaceAll("/", Deno.build.os === "windows" ? "\\" : "/");
+      const candidate = `${root}/${dir.name}/${rel}`.replaceAll(
+        "/",
+        Deno.build.os === "windows" ? "\\" : "/",
+      );
       if (await fileExists(candidate)) return candidate;
     }
   }
@@ -339,7 +376,9 @@ function pickScopedHtml(html: string, sourceUrl: string): string {
 
   if (postCode) {
     const postCodeNeedle = `/post/${postCode}`;
-    const exactSlice = slices.find((slice) => slice.content.includes(postCodeNeedle));
+    const exactSlice = slices.find((slice) =>
+      slice.content.includes(postCodeNeedle),
+    );
     if (exactSlice) return exactSlice.content;
   }
 
@@ -347,7 +386,10 @@ function pickScopedHtml(html: string, sourceUrl: string): string {
   return firstPostSlice?.content ?? slices[0].content;
 }
 
-function extractCandidateUrlsFromHtml(html: string, sourceUrl: string): string[] {
+function extractCandidateUrlsFromHtml(
+  html: string,
+  sourceUrl: string,
+): string[] {
   const scopedHtml = pickScopedHtml(html, sourceUrl);
   const candidates = new Set<string>();
   const directTagCandidates = new Set<string>();
@@ -416,7 +458,8 @@ function extractCandidateUrlsFromHtml(html: string, sourceUrl: string): string[]
   }
 
   // Common Threads payload fields.
-  const structuredFieldRegex = /"(?:video_url|display_url|image_url|url)"\s*:\s*"([^"]+)"/g;
+  const structuredFieldRegex =
+    /"(?:video_url|display_url|image_url|url)"\s*:\s*"([^"]+)"/g;
   for (const match of scopedHtml.matchAll(structuredFieldRegex)) {
     addCandidate(match[1] ?? "");
   }
@@ -459,21 +502,31 @@ export class ThreadsPostDownloader {
   #enableBrowserFallback: boolean;
 
   constructor(opts: ThreadsPostDownloaderOpts = {}) {
-    this.#userAgent = opts.userAgent ??
+    this.#userAgent =
+      opts.userAgent ??
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
     this.#requestTimeoutMs = opts.requestTimeoutMs ?? 15_000;
-    this.#downloader = opts.downloader ?? new DenoHttpDownloader();
+    this.#downloader =
+      opts.downloader ??
+      new DenoHttpDownloader({
+        "user-agent": this.#userAgent,
+        referer: "https://www.threads.com/",
+      });
     this.#enableBrowserFallback = opts.enableBrowserFallback ?? true;
   }
 
   async #fetchHtml(url: string): Promise<string> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#requestTimeoutMs);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      this.#requestTimeoutMs,
+    );
     try {
       const res = await fetch(url, {
         headers: {
           "user-agent": this.#userAgent,
-          "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
         signal: controller.signal,
       });
@@ -483,7 +536,9 @@ export class ThreadsPostDownloader {
       return await res.text();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
-        throw new Error(`threads fetch timeout after ${this.#requestTimeoutMs}ms`);
+        throw new Error(
+          `threads fetch timeout after ${this.#requestTimeoutMs}ms`,
+        );
       }
       throw err;
     } finally {
@@ -494,7 +549,9 @@ export class ThreadsPostDownloader {
   async #fetchCandidatesFromBrowser(url: string): Promise<string[]> {
     const responseCandidates = new Set<string>();
     const domCandidates = new Set<string>();
-    const normalizeCandidate = (raw: string | null | undefined): string | null => {
+    const normalizeCandidate = (
+      raw: string | null | undefined,
+    ): string | null => {
       if (!raw) return null;
       const decoded = decodeEscapedUrl(raw);
       const sanitized = sanitizeDecodedUrl(decoded);
@@ -520,7 +577,8 @@ export class ThreadsPostDownloader {
       const launchAttempts: Array<Record<string, unknown>> = [];
       if (executablePath) launchAttempts.push({ executablePath });
       launchAttempts.push({ channel: "chrome" });
-      if (Deno.build.os === "windows") launchAttempts.push({ channel: "msedge" });
+      if (Deno.build.os === "windows")
+        launchAttempts.push({ channel: "msedge" });
       launchAttempts.push({});
 
       let launchError: unknown;
@@ -528,7 +586,11 @@ export class ThreadsPostDownloader {
         try {
           browser = await chromium.launch({
             headless: true,
-            args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+            args: [
+              "--disable-dev-shm-usage",
+              "--no-first-run",
+              "--no-default-browser-check",
+            ],
             ...attempt,
           });
           break;
@@ -536,7 +598,10 @@ export class ThreadsPostDownloader {
           launchError = err;
         }
       }
-      if (!browser) throw launchError instanceof Error ? launchError : new Error("Unable to launch Chromium");
+      if (!browser)
+        throw launchError instanceof Error
+          ? launchError
+          : new Error("Unable to launch Chromium");
       const page = await browser.newPage({
         userAgent: this.#userAgent,
       });
@@ -546,13 +611,17 @@ export class ThreadsPostDownloader {
         addResponseCandidate(responseUrl);
       });
 
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: this.#requestTimeoutMs });
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: this.#requestTimeoutMs,
+      });
       await page.waitForTimeout(4_000);
 
       const domUrls = await page.evaluate(() => {
         const urls: string[] = [];
         const root =
-          document.querySelector('[data-pagelet="threads_post_page_0"]') ?? document;
+          document.querySelector('[data-pagelet="threads_post_page_0"]') ??
+          document;
         const pushSrcsetUrls = (srcset: string | null | undefined) => {
           if (!srcset) return null;
           for (const token of srcset.split(",")) {
@@ -600,9 +669,10 @@ export class ThreadsPostDownloader {
     }
 
     // Prefer post-root DOM media only. Network responses can include unrelated feed assets.
-    const all = domCandidates.size > 0
-      ? Array.from(domCandidates.values())
-      : Array.from(responseCandidates.values());
+    const all =
+      domCandidates.size > 0
+        ? Array.from(domCandidates.values())
+        : Array.from(responseCandidates.values());
     const videos = all.filter((u) => mediaKindForUrl(u) === "video");
     const images = all.filter((u) => mediaKindForUrl(u) === "image");
     return [...videos, ...images];
@@ -616,7 +686,8 @@ export class ThreadsPostDownloader {
       const launchAttempts: Array<Record<string, unknown>> = [];
       if (executablePath) launchAttempts.push({ executablePath });
       launchAttempts.push({ channel: "chrome" });
-      if (Deno.build.os === "windows") launchAttempts.push({ channel: "msedge" });
+      if (Deno.build.os === "windows")
+        launchAttempts.push({ channel: "msedge" });
       launchAttempts.push({});
 
       let launchError: unknown;
@@ -624,7 +695,11 @@ export class ThreadsPostDownloader {
         try {
           browser = await chromium.launch({
             headless: true,
-            args: ["--disable-dev-shm-usage", "--no-first-run", "--no-default-browser-check"],
+            args: [
+              "--disable-dev-shm-usage",
+              "--no-first-run",
+              "--no-default-browser-check",
+            ],
             ...attempt,
           });
           break;
@@ -632,16 +707,24 @@ export class ThreadsPostDownloader {
           launchError = err;
         }
       }
-      if (!browser) throw launchError instanceof Error ? launchError : new Error("Unable to launch Chromium");
+      if (!browser)
+        throw launchError instanceof Error
+          ? launchError
+          : new Error("Unable to launch Chromium");
 
       const page = await browser.newPage({
         userAgent: this.#userAgent,
       });
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: this.#requestTimeoutMs });
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: this.#requestTimeoutMs,
+      });
       await page.waitForTimeout(4_000);
 
       const text = await page.evaluate(() => {
-        const root = document.querySelector('[data-pagelet="threads_post_page_0"]') as HTMLElement | null;
+        const root = document.querySelector(
+          '[data-pagelet="threads_post_page_0"]',
+        ) as HTMLElement | null;
         return root?.innerText ?? null;
       });
       const normalizedText = text ? normalizeExtractedText(text) : "";
@@ -677,8 +760,12 @@ export class ThreadsPostDownloader {
           .map((candidate) => normalizeCandidateForPostMedia(candidate))
           .filter((candidate): candidate is string => Boolean(candidate)),
       );
-      const videos = allCandidates.filter((u) => mediaKindForUrl(u) === "video");
-      const images = allCandidates.filter((u) => mediaKindForUrl(u) === "image");
+      const videos = allCandidates.filter(
+        (u) => mediaKindForUrl(u) === "video",
+      );
+      const images = allCandidates.filter(
+        (u) => mediaKindForUrl(u) === "image",
+      );
       return [...videos, ...images];
     };
 
@@ -694,8 +781,12 @@ export class ThreadsPostDownloader {
           .filter((candidate): candidate is string => Boolean(candidate)),
       );
       if (browserCandidates.length > 0) {
-        const videos = browserCandidates.filter((u) => mediaKindForUrl(u) === "video");
-        const images = browserCandidates.filter((u) => mediaKindForUrl(u) === "image");
+        const videos = browserCandidates.filter(
+          (u) => mediaKindForUrl(u) === "video",
+        );
+        const images = browserCandidates.filter(
+          (u) => mediaKindForUrl(u) === "image",
+        );
         return [...videos, ...images];
       }
     } catch {
@@ -705,7 +796,9 @@ export class ThreadsPostDownloader {
     return await pickStaticCandidates();
   }
 
-  async inspectPostMediaCandidates(url: string): Promise<Array<{ url: string; kind: MediaKind }>> {
+  async inspectPostMediaCandidates(
+    url: string,
+  ): Promise<Array<{ url: string; kind: MediaKind }>> {
     const candidates = await this.#pickCandidates(url);
     return candidates
       .map((candidate) => {
@@ -713,7 +806,9 @@ export class ThreadsPostDownloader {
         if (!kind) return null;
         return { url: candidate, kind };
       })
-      .filter((item): item is { url: string; kind: MediaKind } => item !== null);
+      .filter(
+        (item): item is { url: string; kind: MediaKind } => item !== null,
+      );
   }
 
   async extractPostText(url: string): Promise<string | null> {
@@ -752,22 +847,31 @@ export class ThreadsPostDownloader {
     if (candidates.length === 0) {
       throw new Error("threads: no media URLs found in page payload");
     }
-    await report("extracting-candidates", `Found ${candidates.length} media candidate(s).`);
+    await report(
+      "extracting-candidates",
+      `Found ${candidates.length} media candidate(s).`,
+    );
 
     const files: Array<{ path: string; kind: MediaKind }> = [];
     const usedUrls = new Set<string>();
     const skippedDownloads: Array<{ url: string; reason: string }> = [];
     let seq = 1;
     for (const mediaUrl of candidates) {
-      await report("downloading-media", `Downloading media ${seq}/${candidates.length}...`, {
-        current: seq,
-        total: candidates.length,
-      });
+      await report(
+        "downloading-media",
+        `Downloading media ${seq}/${candidates.length}...`,
+        {
+          current: seq,
+          total: candidates.length,
+        },
+      );
       const kind = mediaKindForUrl(mediaUrl);
       if (!kind) continue;
 
       const tryDownload = async (candidateUrl: string) => {
-        const ext = extensionFromUrl(candidateUrl) || (kind === "video" ? ".mp4" : ".jpg");
+        const ext =
+          extensionFromUrl(candidateUrl) ||
+          (kind === "video" ? ".mp4" : ".jpg");
         const filename = `threads-${String(seq).padStart(2, "0")}${ext}`;
         const outPath = `${outDir}/${filename}`;
         await this.#downloader.downloadToFile(candidateUrl, outPath);
@@ -788,15 +892,19 @@ export class ThreadsPostDownloader {
         downloaded = true;
       } catch (error) {
         // Signed Threads CDN URLs can expire quickly; refresh once and retry.
-        await report("refreshing-candidates", `Fetching valid URL for item ${seq}/${candidates.length}...`, {
-          current: seq,
-          total: candidates.length,
-        });
+        await report(
+          "refreshing-candidates",
+          `Fetching valid URL for item ${seq}/${candidates.length}...`,
+          {
+            current: seq,
+            total: candidates.length,
+          },
+        );
         const refreshedCandidates = await this.#pickCandidates(url, report);
-        const refreshed = refreshedCandidates.find((u) =>
-          mediaKindForUrl(u) === kind && !usedUrls.has(u)
-        ) ??
-          refreshedCandidates.find((u) => mediaKindForUrl(u) === kind);
+        const refreshed =
+          refreshedCandidates.find(
+            (u) => mediaKindForUrl(u) === kind && !usedUrls.has(u),
+          ) ?? refreshedCandidates.find((u) => mediaKindForUrl(u) === kind);
         if (!refreshed) {
           const reason = error instanceof Error ? error.message : String(error);
           skippedDownloads.push({ url: mediaUrl, reason });
@@ -806,7 +914,10 @@ export class ThreadsPostDownloader {
           await tryDownload(refreshed);
           downloaded = true;
         } catch (retryError) {
-          const reason = retryError instanceof Error ? retryError.message : String(retryError);
+          const reason =
+            retryError instanceof Error
+              ? retryError.message
+              : String(retryError);
           skippedDownloads.push({ url: refreshed, reason });
         }
       }
@@ -822,19 +933,32 @@ export class ThreadsPostDownloader {
         .filter((kind): kind is MediaKind => kind !== null),
     );
     const downloadedKinds = new Set<MediaKind>(files.map((file) => file.kind));
-    const missingKinds = Array.from(expectedKinds.values()).filter((kind) => !downloadedKinds.has(kind));
+    const missingKinds = Array.from(expectedKinds.values()).filter(
+      (kind) => !downloadedKinds.has(kind),
+    );
 
     if (files.length === 0) {
-      const details = skippedDownloads.map((item) => `${item.url} (${item.reason})`).join("; ");
+      const details = skippedDownloads
+        .map((item) => `${item.url} (${item.reason})`)
+        .join("; ");
       const suffix = details ? ` [${details}]` : "";
-      throw new Error(`threads: payload parsed but media downloads failed${suffix}`);
+      throw new Error(
+        `threads: payload parsed but media downloads failed${suffix}`,
+      );
     }
     if (missingKinds.length > 0) {
-      const details = skippedDownloads.map((item) => `${item.url} (${item.reason})`).join("; ");
+      const details = skippedDownloads
+        .map((item) => `${item.url} (${item.reason})`)
+        .join("; ");
       const suffix = details ? ` [${details}]` : "";
-      throw new Error(`threads: missing downloaded media kinds (${missingKinds.join(", ")})${suffix}`);
+      throw new Error(
+        `threads: missing downloaded media kinds (${missingKinds.join(", ")})${suffix}`,
+      );
     }
-    await report("finalizing-download", `Downloaded ${files.length} media file(s).`);
+    await report(
+      "finalizing-download",
+      `Downloaded ${files.length} media file(s).`,
+    );
     return files;
   }
 }
