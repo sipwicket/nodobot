@@ -23,6 +23,7 @@ export class FfmpegTranscoder implements TranscoderPort {
       "4.5M",
       "-preset",
       opts.ffmpegPreset,
+      '-vf "scale=1280:-2"',
       // Embeds global metadata required by some players
       "-flags",
       "+global_header",
