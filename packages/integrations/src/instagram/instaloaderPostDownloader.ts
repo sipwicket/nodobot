@@ -3,6 +3,10 @@ export type InstaloaderPostDownloaderOpts = {
   command?: string;
   /** Path to cookies file passed to `gallery-dl --cookies` (e.g. `cookies.txt`). */
   cookiesFile?: string;
+  /** Instagram username passed to `gallery-dl -u`. */
+  username?: string;
+  /** Instagram password passed to `gallery-dl -p`. */
+  password?: string;
   maxConnectionAttempts?: number;
 };
 
@@ -79,17 +83,26 @@ function decodeErr(bytes: Uint8Array, max = 4000): string {
 export class InstaloaderPostDownloader {
   #command: string;
   #cookiesFile?: string;
+  #username?: string;
+  #password?: string;
   #maxConnectionAttempts: number;
 
   constructor(opts: InstaloaderPostDownloaderOpts = {}) {
     this.#command = opts.command ?? "gallery-dl";
     this.#cookiesFile = opts.cookiesFile ? expandUserPath(opts.cookiesFile) : undefined;
+    this.#username = opts.username?.trim() || undefined;
+    this.#password = opts.password ?? undefined;
     this.#maxConnectionAttempts = opts.maxConnectionAttempts ?? 5;
   }
 
   /** Absolute or expanded cookies path passed to `gallery-dl --cookies`, if configured. */
   get resolvedCookiesFile(): string | undefined {
     return this.#cookiesFile;
+  }
+
+  /** Username passed to `gallery-dl -u`, if configured. */
+  get resolvedUsername(): string | undefined {
+    return this.#username;
   }
 
   /**
@@ -104,6 +117,12 @@ export class InstaloaderPostDownloader {
     const args: string[] = [];
     if (this.#cookiesFile) {
       args.push("--cookies", this.#cookiesFile);
+    }
+    if (this.#username) {
+      args.push("-u", this.#username);
+    }
+    if (this.#password) {
+      args.push("-p", this.#password);
     }
     args.push(
       "--quiet",

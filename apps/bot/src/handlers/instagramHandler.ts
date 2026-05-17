@@ -55,12 +55,21 @@ export function createInstagramHandler() {
       command: Deno.env.get("GALLERY_DL_CMD") ?? Deno.env.get("INSTALOADER_CMD") ?? undefined,
       cookiesFile: Deno.env.get("INSTAGRAM_COOKIES_FILE") ?? Deno.env.get("GALLERY_DL_COOKIES_FILE") ??
         Deno.env.get("COOKIES_FILE") ?? "cookies.txt",
+      username: Deno.env.get("INSTAGRAM_USERNAME") ?? Deno.env.get("GALLERY_DL_USERNAME") ??
+        Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
+      password: Deno.env.get("INSTAGRAM_PASSWORD") ?? Deno.env.get("GALLERY_DL_PASSWORD") ?? undefined,
     });
 
     const cookiesFileForGalleryDl = igDownloader.resolvedCookiesFile;
     if (cookiesFileForGalleryDl !== undefined) {
       logger.info("[instagramHandler] gallery-dl using cookies file (--cookies)", {
         cookiesFile: cookiesFileForGalleryDl,
+      });
+    }
+    const galleryDlUsername = igDownloader.resolvedUsername;
+    if (galleryDlUsername !== undefined) {
+      logger.info("[instagramHandler] gallery-dl using username (-u)", {
+        username: galleryDlUsername,
       });
     }
 
