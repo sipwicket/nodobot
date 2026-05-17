@@ -1,28 +1,44 @@
 export type InstaloaderPostDownloaderOpts = {
   /** Executable name or path (default `gallery-dl`). */
   command?: string;
-  /** Path to cookies file passed to `gallery-dl --cookies` (e.g. `cookies.txt`). */
+  /**
+   * Path to the cookies file passed to `gallery-dl --cookies` (Mozilla/Netscape `cookies.txt` format).
+   *
+   * Path resolution rules:
+   * - `~` and `~/...` are expanded against `$HOME` / `$USERPROFILE`.
+   * - Relative paths are resolved against `Deno.cwd()` (the project root when launched
+   *   via `deno task start` or via the Docker `WORKDIR /app`). This matters because
+   *   `gallery-dl` is launched with `cwd` set to a temp directory, so a bare
+   *   `cookies.txt` would otherwise be looked up next to the temp dir and silently miss.
+   */
   cookiesFile?: string;
-  /** Instagram username passed to `gallery-dl -u`. */
-  username?: string;
-  /** Instagram password passed to `gallery-dl -p`. */
-  password?: string;
   maxConnectionAttempts?: number;
 };
 
-/** Expands a leading `~` so values like `~/.config/instaloader/session-USER` work when read from env (no shell expansion). */
-function expandUserPath(path: string): string {
-  if (path === "~") {
-    return Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE") ?? path;
+const ABSOLUTE_PATH_RE = /^(?:[/\\]|[A-Za-z]:[\\/])/;
+
+/**
+ * Expand a leading `~` and resolve relative paths against `Deno.cwd()` (project root).
+ *
+ * No shell expansion is performed; this is purely string-level so values read from env
+ * (`~/.config/...`, `cookies.txt`, `/app/cookies.txt`, `C:\...`) all behave the same.
+ */
+function resolveCookiesPath(path: string): string {
+  let p = path;
+  if (p === "~") {
+    return Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE") ?? p;
   }
-  if (path.startsWith("~/") || path.startsWith("~\\")) {
+  if (p.startsWith("~/") || p.startsWith("~\\")) {
     const home = Deno.env.get("HOME") ?? Deno.env.get("USERPROFILE");
-    if (!home) return path;
-    const rest = path.slice(2).replaceAll("\\", "/");
-    const base = home.replace(/[/\\]$/, "");
-    return `${base}/${rest}`;
+    if (home) {
+      const rest = p.slice(2).replaceAll("\\", "/");
+      const base = home.replace(/[/\\]$/, "");
+      p = `${base}/${rest}`;
+    }
   }
-  return path;
+  if (ABSOLUTE_PATH_RE.test(p)) return p;
+  const cwd = Deno.cwd().replace(/[/\\]$/, "");
+  return `${cwd}/${p}`;
 }
 
 const MEDIA_EXT_IMAGE = new Set([".jpg", ".jpeg", ".png", ".webp"]);
@@ -79,35 +95,31 @@ function decodeErr(bytes: Uint8Array, max = 4000): string {
 /**
  * Downloads one Instagram post (by shortcode) into a subdirectory of `workDir`
  * using `gallery-dl`, then returns ordered media file paths.
+ *
+ * Authentication: gallery-dl no longer supports `-u/-p` for Instagram (it logs an
+ * error and falls back to anonymous, which Instagram immediately redirects to its
+ * login page). Authenticated downloads must be done via a `cookies.txt` exported
+ * from a logged-in browser session.
  */
 export class InstaloaderPostDownloader {
   #command: string;
   #cookiesFile?: string;
-  #username?: string;
-  #password?: string;
   #maxConnectionAttempts: number;
 
   constructor(opts: InstaloaderPostDownloaderOpts = {}) {
     this.#command = opts.command ?? "gallery-dl";
-    this.#cookiesFile = opts.cookiesFile ? expandUserPath(opts.cookiesFile) : undefined;
-    this.#username = opts.username?.trim() || undefined;
-    this.#password = opts.password ?? undefined;
+    this.#cookiesFile = opts.cookiesFile ? resolveCookiesPath(opts.cookiesFile) : undefined;
     this.#maxConnectionAttempts = opts.maxConnectionAttempts ?? 5;
   }
 
-  /** Absolute or expanded cookies path passed to `gallery-dl --cookies`, if configured. */
+  /** Absolute, expanded cookies path that will be passed to `gallery-dl --cookies`, if configured. */
   get resolvedCookiesFile(): string | undefined {
     return this.#cookiesFile;
   }
 
-  /** Username passed to `gallery-dl -u`, if configured. */
-  get resolvedUsername(): string | undefined {
-    return this.#username;
-  }
-
   /**
    * @param shortcode Post shortcode without a leading hyphen.
-   * @param workDir Empty directory used as Instaloader working directory (caller-owned).
+   * @param workDir Empty directory used as gallery-dl working directory (caller-owned).
    */
   async downloadPost(shortcode: string, workDir: string): Promise<{ path: string; kind: "image" | "video" }[]> {
     const target = shortcode.trim();
@@ -117,12 +129,6 @@ export class InstaloaderPostDownloader {
     const args: string[] = [];
     if (this.#cookiesFile) {
       args.push("--cookies", this.#cookiesFile);
-    }
-    if (this.#username) {
-      args.push("-u", this.#username);
-    }
-    if (this.#password) {
-      args.push("-p", this.#password);
     }
     args.push(
       "--quiet",

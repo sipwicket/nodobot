@@ -114,7 +114,7 @@ Identical in behavior to the Twitter fixer, but for TikTok URLs.
 
 **Files:** [`apps/bot/src/handlers/instagramHandler.ts`](apps/bot/src/handlers/instagramHandler.ts), [`packages/integrations/src/instagram/instaloaderPostDownloader.ts`](packages/integrations/src/instagram/instaloaderPostDownloader.ts), [`packages/core/src/features/link/normalizers.ts`](packages/core/src/features/link/normalizers.ts), [`packages/shared/src/progressBar.ts`](packages/shared/src/progressBar.ts)
 
-When a user posts an Instagram link, the bot attempts to **download the actual media** (photos and videos) from the post using the **[Instaloader](https://github.com/instaloader/instaloader)** CLI and send them directly into the Telegram chat as native media.
+When a user posts an Instagram link, the bot attempts to **download the actual media** (photos and videos) from the post using the **[gallery-dl](https://github.com/mikf/gallery-dl)** CLI and send them directly into the Telegram chat as native media.
 
 ### End-to-End Flow
 
@@ -122,25 +122,27 @@ When a user posts an Instagram link, the bot attempts to **download the actual m
 2. Bot **deletes the original message** immediately (when configured).
 3. Bot may send a **progress message** with an ASCII progress bar.
 4. Extracts the **shortcode** from the URL pathname.
-5. Runs **Instaloader** in a temporary directory with target `-- -{shortcode}` (see Instaloader docs).
+5. Runs **gallery-dl** in a temporary directory targeting `https://www.instagram.com/p/{shortcode}/`, with `--cookies <cookies.txt>` for authentication.
 6. Collects produced image/video files under the post directory, sorted for stable carousel order.
 7. Sends all media to the chat as a **Telegram media group** (album), with a caption from the tenant template.
 8. **Cleans up the temporary directory** after sending (or on error).
 
-### Instaloader integration
+### gallery-dl integration
 
-- **Runtime:** `instaloader` must be on `PATH` (Dockerfile installs `instaloader==4.15.1` globally).
-- **Authentication (recommended):** `INSTALOADER_LOGIN` maps to `--login`; optional `INSTALOADER_SESSION_FILE` maps to `-f` / `--sessionfile` for a non-default session path (see [Instaloader login](https://instaloader.github.io/basic-usage.html#login)).
-- **Override executable:** `INSTALOADER_CMD` (defaults to `instaloader`).
-- **Quiet / non-interactive:** Instaloader is invoked with `-q`; without a valid session, downloads may fail with login-related errors.
+- **Runtime:** `gallery-dl` must be on `PATH` (Dockerfile installs it via `pip` and ships a small `/usr/local/bin/gallery-dl` shim that calls `python3 -m gallery_dl`).
+- **Authentication (required for Instagram):** A Mozilla/Netscape `cookies.txt` exported from a logged-in browser session is the only supported auth method — gallery-dl's Instagram extractor explicitly disables `-u/-p` login (its `_login_impl` returns no cookies and logs *"Login with username & password is no longer supported. Use browser cookies instead."*). Without cookies, requests are redirected to `/accounts/login/` and fail with `[instagram][error] HTTP redirect to login page`.
+- **Cookies path:** Read from `INSTAGRAM_COOKIES_FILE` → `GALLERY_DL_COOKIES_FILE` → `COOKIES_FILE`, defaulting to `cookies.txt`. Relative paths and a leading `~` are resolved against the project root (`Deno.cwd()` / Docker `WORKDIR /app`) before being passed to `gallery-dl --cookies` — important because gallery-dl is launched with `cwd` set to a per-download temp dir.
+- **Docker:** `docker-compose.yml` bind-mounts `./cookies.txt` (project root) to `/app/cookies.txt:ro` with `create_host_path: false` and exports `COOKIES_FILE=/app/cookies.txt`.
+- **Override executable:** `GALLERY_DL_CMD` (legacy alias `INSTALOADER_CMD`); defaults to `gallery-dl`.
+- **Quiet:** gallery-dl is invoked with `--quiet`.
 
 ### Media type support
 
-Instaloader writes JPEG/PNG/WebP and MP4 (and similar) to disk; the bot classifies extensions into Telegram **photo** vs **video** payloads. Carousels are represented as multiple files in one post folder; files are ordered lexicographically after a recursive directory walk.
+gallery-dl writes JPEG/PNG/WebP and MP4 (and similar) to disk; the bot classifies extensions into Telegram **photo** vs **video** payloads. Carousels are represented as multiple files in one post folder; files are ordered lexicographically after a recursive directory walk.
 
 ### Fallback behavior
 
-If Instaloader fails or produces no media files, the bot falls back to **URL fixing** (replacing `instagram.com` with `kksave.com`) when that feature is enabled.
+If gallery-dl fails or produces no media files, the bot falls back to **URL fixing** (replacing `instagram.com` with `kksave.com`) when that feature is enabled.
 
 ---
 
@@ -306,9 +308,8 @@ The bot loads its configuration from a `config.json` file at startup. Configurat
 | Variable              | Required | Description                                                    |
 |-----------------------|----------|----------------------------------------------------------------|
 | `TELEGRAM_TOKEN`      | Yes      | Telegram Bot API token (from BotFather)                        |
-| `INSTALOADER_LOGIN`   | No       | Instagram username for Instaloader `--login` (use with a saved session for non-interactive runs) |
-| `INSTALOADER_SESSION_FILE` | No  | Path for Instaloader `-f` / `--sessionfile` (session key file)   |
-| `INSTALOADER_CMD`     | No       | Instaloader executable name or path (default: `instaloader`)    |
+| `INSTAGRAM_COOKIES_FILE` | No    | Path to a Mozilla/Netscape `cookies.txt` for gallery-dl `--cookies`. Relative paths resolve against the project root. (Aliases: `GALLERY_DL_COOKIES_FILE`, `COOKIES_FILE`. Default: `cookies.txt`) |
+| `GALLERY_DL_CMD`      | No       | gallery-dl executable name or path (default: `gallery-dl`; legacy alias `INSTALOADER_CMD`) |
 
 ---
 

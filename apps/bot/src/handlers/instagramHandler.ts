@@ -51,27 +51,20 @@ export function createInstagramHandler() {
       }
       : undefined;
 
+    // gallery-dl no longer supports username/password login for Instagram
+    // (its `_login_impl` for the instagram extractor returns empty cookies and logs
+    // "Login with username & password is no longer supported. Use browser cookies instead.").
+    // Authenticated Instagram downloads MUST be done via a cookies.txt exported from a
+    // logged-in browser session.
     const igDownloader = new InstaloaderPostDownloader({
       command: Deno.env.get("GALLERY_DL_CMD") ?? Deno.env.get("INSTALOADER_CMD") ?? undefined,
       cookiesFile: Deno.env.get("INSTAGRAM_COOKIES_FILE") ?? Deno.env.get("GALLERY_DL_COOKIES_FILE") ??
         Deno.env.get("COOKIES_FILE") ?? "cookies.txt",
-      username: Deno.env.get("INSTAGRAM_USERNAME") ?? Deno.env.get("GALLERY_DL_USERNAME") ??
-        Deno.env.get("INSTALOADER_LOGIN") ?? undefined,
-      password: Deno.env.get("INSTAGRAM_PASSWORD") ?? Deno.env.get("GALLERY_DL_PASSWORD") ?? undefined,
     });
 
-    const cookiesFileForGalleryDl = igDownloader.resolvedCookiesFile;
-    if (cookiesFileForGalleryDl !== undefined) {
-      logger.info("[instagramHandler] gallery-dl using cookies file (--cookies)", {
-        cookiesFile: cookiesFileForGalleryDl,
-      });
-    }
-    const galleryDlUsername = igDownloader.resolvedUsername;
-    if (galleryDlUsername !== undefined) {
-      logger.info("[instagramHandler] gallery-dl using username (-u)", {
-        username: galleryDlUsername,
-      });
-    }
+    logger.info("[instagramHandler] gallery-dl using cookies file (--cookies)", {
+      cookiesFile: igDownloader.resolvedCookiesFile,
+    });
 
     let tempDir: string | null = null;
     try {

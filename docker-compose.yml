@@ -8,6 +8,17 @@ services:
     env_file:
       - .env
     environment:
+      # Absolute path inside the container; matches the bind mount below.
+      # gallery-dl reads this for authenticated Instagram downloads.
       COOKIES_FILE: /app/cookies.txt
     volumes:
-      - ./cookies.txt:/app/cookies.txt:ro
+      # Mount cookies.txt from the project root (read-only).
+      # `create_host_path: false` makes docker-compose fail fast if cookies.txt
+      # is missing on the host, instead of silently auto-creating an empty
+      # *directory* with the same name (which would break the bind).
+      - type: bind
+        source: ./cookies.txt
+        target: /app/cookies.txt
+        read_only: true
+        bind:
+          create_host_path: false

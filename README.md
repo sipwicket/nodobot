@@ -15,7 +15,7 @@
 
 - [Deno](https://deno.com/)
 - [ffmpeg](https://ffmpeg.org/) (required for WebM → MP4 conversion)
-- [Python 3](https://www.python.org/) with [Instaloader](https://github.com/instaloader/instaloader) on `PATH` (pinned in the Docker image as `instaloader==4.15.1`; required for native Instagram downloads)
+- [Python 3](https://www.python.org/) with [gallery-dl](https://github.com/mikf/gallery-dl) on `PATH` (installed via pip in the Docker image; required for native Instagram downloads)
 - A telegram bot token
   - You can get one by talking to [BotFather](https://t.me/botfather)
 
@@ -25,8 +25,10 @@
 2. Set the environment variable `TELEGRAM_TOKEN` to your bot token
    - Bash: `export TELEGRAM_TOKEN=<your token>`
    - PowerShell: `$env:TELEGRAM_TOKEN = "<your token>"`
-3. (Optional) Configure Instaloader authentication for reliable Instagram downloads:
-   - Create a session once (see [Instaloader login](https://instaloader.github.io/basic-usage.html#login)), then set `INSTALOADER_LOGIN` and optionally `INSTALOADER_SESSION_FILE` (passed to Instaloader `-f`).
+3. (Recommended) Configure gallery-dl cookies for reliable Instagram downloads:
+   - Instagram requires authentication; gallery-dl no longer supports username/password login for Instagram and will be redirected to the login page when run anonymously.
+   - Export `cookies.txt` from a logged-in browser session (e.g. *Get cookies.txt LOCALLY* for Chrome, *cookies.txt* for Firefox). Make sure `sessionid`, `csrftoken`, and `ds_user_id` are present.
+   - Place the file at the **project root** as `cookies.txt`. The bot reads it via `INSTAGRAM_COOKIES_FILE` / `GALLERY_DL_COOKIES_FILE` / `COOKIES_FILE` (defaulting to `./cookies.txt`, resolved against the project root).
 4. Configure multitenancy placeholders:
    - **Subscription allowlist** (placeholder): `export ACTIVE_TENANTS="123456789,987654321"`
      - `TenantId` is the Telegram chat id (group id).
@@ -41,12 +43,15 @@
 1. Create and fill `.env` from `.env.example`:
    - `cp .env.example .env`
    - Required: `TELEGRAM_TOKEN`
-2. (Optional) Create `apps/bot/tenant_overrides.json` if you need per-tenant settings.
-3. Build and start:
+2. Drop a `cookies.txt` (Mozilla/Netscape format) at the project root for Instagram auth.
+   - `docker-compose.yml` bind-mounts `./cookies.txt` to `/app/cookies.txt:ro` and exports `COOKIES_FILE=/app/cookies.txt` automatically.
+   - `create_host_path: false` is set on the bind, so compose will fail fast if `cookies.txt` is missing rather than silently creating an empty directory.
+3. (Optional) Create `apps/bot/tenant_overrides.json` if you need per-tenant settings.
+4. Build and start:
    - `docker compose up -d --build`
-4. Check logs:
+5. Check logs:
    - `docker compose logs -f bot`
-5. Stop:
+6. Stop:
    - `docker compose down`
 
 ## Multitenancy Model (Current)
@@ -69,11 +74,11 @@
   - Duplicate link detection across YouTube/Twitter/TikTok/Instagram variants
   - Twitter/X embed rewriting to `fxtwitter.com`
   - TikTok embed rewriting to `fxtiktok.com`
-  - Instagram native download (Instaloader) + progress message + fallback to `kksave.com` on failure
+  - Instagram native download (gallery-dl + cookies) + progress message + fallback to `kksave.com` on failure
   - `.webm` URL conversion to MP4 and original message deletion
   - Duplicate image detection (send same image twice)
   - `/help` output and direct-reply behavior
-- Monitor logs and resource usage; disable Instagram download per tenant if Instaloader is unstable or too slow for your environment.
+- Monitor logs and resource usage; disable Instagram download per tenant if gallery-dl is unstable or too slow for your environment.
 - Cutover:
   - Deploy Deno bot alongside legacy bot (different bot token), or stop legacy and start Deno.
   - Keep rollback ready: stop Deno bot and restart legacy bot using the original Node entrypoint.
