@@ -36,7 +36,7 @@ export type TenantSettingsV1 = {
   };
   instagram: {
     preferNativeDownload: boolean;
-    fallbackFixDomain: "kksave.com";
+    fallbackFixDomain: "instagram.com";
     minRequestIntervalMs: number;
     retryBackoffMs: [number, number, number, number];
     progressUpdates: boolean;
@@ -58,15 +58,15 @@ export type TenantSettingsV1 = {
     deleteOriginalMessage: boolean;
     maxInputSizeMb: number;
     ffmpegPreset:
-      | "ultrafast"
-      | "superfast"
-      | "veryfast"
-      | "faster"
-      | "fast"
-      | "medium"
-      | "slow"
-      | "slower"
-      | "veryslow";
+    | "ultrafast"
+    | "superfast"
+    | "veryfast"
+    | "faster"
+    | "fast"
+    | "medium"
+    | "slow"
+    | "slower"
+    | "veryslow";
     crf: number;
     audioBitrateKbps: number;
     postTemplate: string;
@@ -135,7 +135,7 @@ export function defaultTenantSettingsV1(): TenantSettingsV1 {
     },
     instagram: {
       preferNativeDownload: true,
-      fallbackFixDomain: "kksave.com",
+      fallbackFixDomain: "instagram.com",
       minRequestIntervalMs: 2000,
       retryBackoffMs: [1000, 2000, 5000, 15000],
       progressUpdates: true,
@@ -296,7 +296,7 @@ export function validateTenantSettingsV1(input: unknown): TenantSettingsV1 {
 
   merged.twitterFix.fixerDomain = "fxtwitter.com";
   merged.tiktokFix.fixerDomain = "fxtiktok.com";
-  merged.instagram.fallbackFixDomain = "kksave.com";
+  merged.instagram.fallbackFixDomain = "instagram.com";
   merged.webmConversion.ffmpegPreset = requireLiteral(
     merged.webmConversion.ffmpegPreset,
     [

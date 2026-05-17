@@ -90,7 +90,7 @@ export function threadsUrlIsFixed(url: string): boolean {
 
 export function fixInstagramUrl(
   pathname: string,
-  fixerDomain: string = 'kksave.com',
+  fixerDomain: string = 'instagram.com',
 ): string {
   return `https://${fixerDomain}${pathname}`;
 }
