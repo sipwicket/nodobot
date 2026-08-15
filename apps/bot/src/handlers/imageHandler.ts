@@ -4,6 +4,11 @@ import type { ImageCachePort } from "@core/contracts/cachePorts.ts";
 import { averageHash } from "@core/features/image/perceptualHash.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
+import {
+  CooldownGate,
+  TelegramNetworkError,
+  retryWithTimeout,
+} from "../networkRetry.ts";
 
 function formatTimeAgo(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -16,8 +21,20 @@ function formatTimeAgo(ms: number): string {
   return `${days} day${days !== 1 ? "s" : ""} ago`;
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
 export function createImageHandler(deps: { imageCache: ImageCachePort }) {
-  const downloader = new DenoHttpDownloader();
+  const timeoutMs = envInt("TELEGRAM_FILE_TIMEOUT_MS", 10_000);
+  const attempts = envInt("TELEGRAM_FILE_ATTEMPTS", 3);
+  const cooldownMs = envInt("TELEGRAM_FILE_COOLDOWN_MS", 60_000);
+  const downloader = new DenoHttpDownloader({}, { timeoutMs });
+  const fileApiCooldown = new CooldownGate(1, cooldownMs);
 
   return async function imageHandler(ctx: BotContext) {
     const logger = loggerFor(ctx);
@@ -32,15 +49,56 @@ export function createImageHandler(deps: { imageCache: ImageCachePort }) {
     }
     if (!msg.photo || msg.photo.length === 0) return;
 
+    if (fileApiCooldown.isOpen()) {
+      logger.debug("[imageHandler] skipping duplicate check; telegram file API cooldown", {
+        remainingMs: fileApiCooldown.remainingMs(),
+      });
+      return;
+    }
+
     const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
     const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     // Smallest thumbnail is first.
     const fileId = msg.photo[0].file_id;
-    const file = await ctx.api.getFile(fileId);
-    const url = `https://api.telegram.org/file/bot${Deno.env.get("TELEGRAM_TOKEN")}/${file.file_path}`;
+    const token = Deno.env.get("TELEGRAM_TOKEN");
+    if (!token) return;
 
-    const bytes = await downloader.downloadToBytes(url);
+    const retryOpts = { attempts, timeoutMs, delaysMs: [400, 1600] };
+
+    let bytes: Uint8Array;
+    try {
+      const file = await retryWithTimeout(
+        "getFile",
+        (signal) => ctx.api.getFile(fileId, signal),
+        retryOpts,
+      );
+      if (!file.file_path) {
+        logger.warn("[imageHandler] getFile returned no file_path; skipping duplicate check");
+        return;
+      }
+      const url = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+      bytes = await retryWithTimeout(
+        "downloadFile",
+        (_signal) => downloader.downloadToBytes(url),
+        retryOpts,
+      );
+      fileApiCooldown.recordSuccess();
+    } catch (err) {
+      const opened = fileApiCooldown.recordFailure();
+      const networkErr = err instanceof TelegramNetworkError ? err : undefined;
+      logger.warn("[imageHandler] skipped duplicate-image check; telegram file fetch failed", {
+        reason: networkErr ? "telegram_file_unreachable" : "telegram_file_fetch_failed",
+        operation: networkErr?.operation,
+        attempts: networkErr?.attempts ?? attempts,
+        timeoutMs: networkErr?.timeoutMs ?? timeoutMs,
+        cause: networkErr?.causeCode,
+        error: err instanceof Error ? err.message : String(err),
+        cooldownMs: opened ? cooldownMs : undefined,
+      });
+      return;
+    }
+
     const hash = await averageHash(bytes, tenant.settings.duplicateImages.hashBits);
     logger.debug("[imageHandler] computed image hash", {
       hash,
@@ -68,4 +126,3 @@ export function createImageHandler(deps: { imageCache: ImageCachePort }) {
     );
   };
 }
-

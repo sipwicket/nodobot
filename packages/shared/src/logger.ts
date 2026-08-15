@@ -1,3 +1,5 @@
+import { redactSecrets } from "./redact.ts";
+
 export type LogLevel = "error" | "warn" | "info" | "debug";
 
 type LoggerOpts = {
@@ -69,7 +71,9 @@ export class Logger {
         ? `[tenant:${String(tenantId)}${tenantName ? ` (${tenantName})` : ""}] `
         : "";
 
-    const line = `[${ts}] [${level.toUpperCase()}] ${tenantPrefix}${msg}${metaStr}`;
+    const line = redactSecrets(
+      `[${ts}] [${level.toUpperCase()}] ${tenantPrefix}${msg}${metaStr}`,
+    );
 
     if (level === "error") console.error(line);
     else if (level === "warn") console.warn(line);

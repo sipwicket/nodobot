@@ -1,7 +1,9 @@
 import "https://deno.land/std@0.224.0/dotenv/load.ts";
 import { Bot, type MiddlewareFn } from "npm:grammy@1.36.0";
+import { redactSecrets } from "@shared/redact.ts";
 import { baseLogger } from "./logger.ts";
 import type { BotContext } from "./context.ts";
+import { isTransientNetworkError } from "./networkRetry.ts";
 import { tenantResolver } from "./middleware/tenant.ts";
 import { subscriptionGate } from "./middleware/subscription.ts";
 import {
@@ -29,25 +31,34 @@ if (!token) {
   Deno.exit(1);
 }
 
-const bot = new Bot<BotContext>(token);
+const bot = new Bot<BotContext>(token, {
+  client: {
+    // npm:grammy uses node-fetch; Deno's fetch handles TLS/timeouts more reliably.
+    fetch: ((input, init) => globalThis.fetch(input, init)) as typeof fetch,
+  },
+});
 
 bot.catch((err) => {
   const { error, ctx } = err;
+  const raw = error ?? err;
+  const message = redactSecrets(raw instanceof Error ? raw.message : String(raw));
+  const stack = raw instanceof Error && raw.stack ? redactSecrets(raw.stack) : undefined;
 
-  // Log full error details to stderr for debugging.
-  console.error("Unhandled bot error:", error ?? err);
+  // Never print the raw error object: node-fetch includes the bot token in the URL.
+  console.error("Unhandled bot error:", message);
+  if (stack) console.error(stack);
 
   baseLogger.error("Unhandled bot error", {
-    name: error?.name,
-    message: error?.message,
-    stack: error?.stack,
-    // These are grammY-specific and may be undefined for other errors.
-    method: (error as any)?.method,
-    payload: (error as any)?.payload,
+    name: raw instanceof Error ? raw.name : undefined,
+    message,
+    stack,
+    method: (error as { method?: unknown } | undefined)?.method,
+    payload: (error as { payload?: unknown } | undefined)?.payload,
     update_id: ctx.update.update_id,
   });
 
-  // Best-effort user-visible error; never throw from catch.
+  // Transient Telegram blips should not announce a crash in chat.
+  if (isTransientNetworkError(raw)) return;
   ctx.reply("sipchan died lol").catch(() => {});
 });
 
