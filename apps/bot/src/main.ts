@@ -115,11 +115,11 @@ bot.on(
 );
 bot.on(
   "message:text",
-  chainMessageHandler("instagramHandler", createInstagramHandler()),
+  chainMessageHandler("instagramHandler", createInstagramHandler({ linkCache })),
 );
 bot.on(
   "message:text",
-  chainMessageHandler("threadsHandler", createThreadsHandler()),
+  chainMessageHandler("threadsHandler", createThreadsHandler({ linkCache })),
 );
 bot.on("message:text", chainMessageHandler("webmHandler", createWebmHandler()));
 bot.on(

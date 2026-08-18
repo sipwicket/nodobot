@@ -1,12 +1,20 @@
 import type { BotContext } from "../context.ts";
 import { DenoTempFiles, InstaloaderPostDownloader } from "@integrations/mod.ts";
+import type { LinkCachePort } from "@core/contracts/cachePorts.ts";
 import { extractShortcode, getInstagramPathname, fixInstagramUrl } from "@core/features/link/normalizers.ts";
+import { storeLink } from "@core/features/link/duplicateLinks.ts";
 import { generateProgressBar } from "@shared/progressBar.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
+import {
+  describeMediaPostFailure,
+  isTelegramFloodWait,
+  notifyChatAfterError,
+  withFloodWaitRetry,
+} from "../telegramErrors.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
-export function createInstagramHandler() {
+export function createInstagramHandler(deps: { linkCache: LinkCachePort }) {
   const temp = new DenoTempFiles();
 
   return async function instagramHandler(ctx: BotContext) {
@@ -34,6 +42,7 @@ export function createInstagramHandler() {
     });
 
     const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
+    const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     // Delete original early (legacy behavior).
     if (tenant.settings.instagram.deleteOriginalMessage) {
@@ -99,30 +108,61 @@ export function createInstagramHandler() {
           batchSize: batch.length,
           totalItems: items.length,
         });
-        await ctx.api.sendMediaGroup(
-          tenant.chatId,
-          batch.map((it) => ({
-            type: it.kind === "video" ? "video" : "photo",
-            media: new InputFile(it.path),
-            caption: it.caption,
-            parse_mode: "HTML",
-          })) as any,
+        await withFloodWaitRetry(() =>
+          ctx.api.sendMediaGroup(
+            tenant.chatId,
+            batch.map((it) => ({
+              type: it.kind === "video" ? "video" : "photo",
+              media: new InputFile(it.path),
+              caption: it.caption,
+              parse_mode: "HTML",
+            })) as any,
+          )
         );
+      }
+
+      if (tenant.settings.featureFlags.duplicateLinks) {
+        await storeLink({
+          tenantId: tenant.tenantId,
+          url,
+          author,
+          dateMs,
+          cache: deps.linkCache,
+          cacheSize: tenant.settings.duplicateLinks.cacheSize,
+        });
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       logger.error("[instagramHandler] Instagram download failed", {
         error: errMsg,
       });
-      // Fallback to URL fixer (legacy behavior).
-      if (tenant.settings.featureFlags.instagramFallbackFix) {
+      if (progress) {
+        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => { });
+      }
+
+      const code = e !== null && typeof e === "object"
+        ? (e as { error_code?: unknown }).error_code
+        : undefined;
+      const isTelegramSendError = isTelegramFloodWait(e) ||
+        typeof code === "number" ||
+        /Call to 'send(?:MediaGroup|Photo|Video|Message)' failed/i.test(errMsg);
+
+      // URL fixer is only a fallback for download failures, not Telegram send/rate-limit errors.
+      if (!isTelegramSendError && tenant.settings.featureFlags.instagramFallbackFix) {
         const fixed = fixInstagramUrl(pathname, tenant.settings.instagram.fallbackFixDomain);
         await ctx.api.sendMessage(tenant.chatId, `<b>${author}</b> posted:\n${fixed}`, { parse_mode: "HTML" }).catch(() => { });
       } else {
-        await ctx.api.sendMessage(tenant.chatId, `Instagram download failed: ${errMsg}`).catch(() => { });
-      }
-      if (progress) {
-        await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch(() => { });
+        const userMessage = describeMediaPostFailure(e, "Instagram");
+        logger.info("[instagramHandler] explaining failure to chat", { userMessage });
+        await notifyChatAfterError({
+          err: e,
+          send: () => ctx.api.sendMessage(tenant.chatId, userMessage),
+          onSendFailure: (sendErr) => {
+            logger.warn("[instagramHandler] failed to send error notice to chat", {
+              error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+            });
+          },
+        });
       }
     } finally {
       if (tempDir) await temp.removePath(tempDir);

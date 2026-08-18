@@ -6,6 +6,7 @@ import {
   fixTiktokUrl,
   fixTwitterUrl,
   getInstagramPathname,
+  getThreadsPathname,
   getTiktokId,
   getTiktokUser,
   getTwitterId,
@@ -14,7 +15,7 @@ import {
   tiktokUrlIsFixed,
   twitterUrlIsFixed,
 } from "@core/features/link/normalizers.ts";
-import { checkAndStoreLink } from "@core/features/link/duplicateLinks.ts";
+import { checkAndStoreLink, findDuplicateLink } from "@core/features/link/duplicateLinks.ts";
 import type { LinkCachePort } from "@core/contracts/cachePorts.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor, type TenantAwareLogger } from "../logger.ts";
@@ -79,6 +80,28 @@ async function deleteOriginalIfPossible(
   }
 }
 
+function isNativeDownloadCandidate(
+  tenant: NonNullable<BotContext["tenant"]>,
+  url: string,
+): boolean {
+  const flags = tenant.settings.featureFlags;
+  if (
+    flags.instagramDownload &&
+    tenant.settings.instagram.preferNativeDownload &&
+    getInstagramPathname(url)
+  ) {
+    return true;
+  }
+  if (
+    flags.threadsDownload &&
+    tenant.settings.threads.preferNativeDownload &&
+    getThreadsPathname(url)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
   return async function entityHandler(ctx: BotContext) {
     const logger = loggerFor(ctx);
@@ -119,6 +142,8 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
     const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     // Duplicate detection applies to all URLs.
+    // Native Instagram/Threads downloads store the link only after media is actually sent,
+    // so a failed download (rate limit, gallery-dl error, etc.) can be retried.
     if (tenant.settings.featureFlags.duplicateLinks) {
       logger.debug(
         '[entityHandler] duplicateLinks feature enabled, checking cache',
@@ -126,15 +151,22 @@ export function createEntityHandler(deps: { linkCache: LinkCachePort }) {
           urlCount: urls.length,
         },
       );
+      const deferStore = urls.length === 1 && isNativeDownloadCandidate(tenant, urls[0]);
       for (const url of urls) {
-        const dup = await checkAndStoreLink({
-          tenantId: tenant.tenantId,
-          url,
-          author,
-          dateMs,
-          cache: deps.linkCache,
-          cacheSize: tenant.settings.duplicateLinks.cacheSize,
-        });
+        const dup = deferStore
+          ? await findDuplicateLink({
+            tenantId: tenant.tenantId,
+            url,
+            cache: deps.linkCache,
+          })
+          : await checkAndStoreLink({
+            tenantId: tenant.tenantId,
+            url,
+            author,
+            dateMs,
+            cache: deps.linkCache,
+            cacheSize: tenant.settings.duplicateLinks.cacheSize,
+          });
         if (dup) {
           logger.info('[entityHandler] duplicate link detected', {
             url,

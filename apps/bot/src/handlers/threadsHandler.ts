@@ -1,10 +1,17 @@
 import type { BotContext } from "../context.ts";
 import { DenoTempFiles, ThreadsPostDownloader } from "@integrations/mod.ts";
 import type { ThreadsDownloadProgress } from "@integrations/mod.ts";
+import type { LinkCachePort } from "@core/contracts/cachePorts.ts";
 import { getThreadsPathname, extractThreadsPostCode } from "@core/features/link/normalizers.ts";
+import { storeLink } from "@core/features/link/duplicateLinks.ts";
 import { generateProgressBar } from "@shared/progressBar.ts";
 import { renderTemplate } from "@core/tenancy/tenantSettings.ts";
 import { loggerFor } from "../logger.ts";
+import {
+  describeMediaPostFailure,
+  notifyChatAfterError,
+  withFloodWaitRetry,
+} from "../telegramErrors.ts";
 import { InputFile } from "npm:grammy@1.36.0";
 
 function escapeHtml(text: string): string {
@@ -35,7 +42,7 @@ async function inspectDownloadedMedia(path: string) {
   }
 }
 
-export function createThreadsHandler() {
+export function createThreadsHandler(deps: { linkCache: LinkCachePort }) {
   const temp = new DenoTempFiles();
   const progressTotal = 10;
   const stageProgressStep: Record<ThreadsDownloadProgress["stage"], number> = {
@@ -86,6 +93,7 @@ export function createThreadsHandler() {
 
     logger.info("[threadsHandler] Threads download triggered", { url, pathname, postCode });
     const author = msg.from?.first_name ?? msg.from?.username ?? "Someone";
+    const dateMs = (msg.date ?? Math.floor(Date.now() / 1000)) * 1000;
 
     if (tenant.settings.threads.deleteOriginalMessage) {
       await ctx.api.deleteMessage(tenant.chatId, msg.message_id).catch((err) => {
@@ -181,14 +189,16 @@ export function createThreadsHandler() {
           batchDiagnostics,
         });
         try {
-          await ctx.api.sendMediaGroup(
-            tenant.chatId,
-            batch.map((it, idx) => ({
-              type: it.kind === "video" ? "video" : "photo",
-              media: new InputFile(it.path),
-              caption: i === 0 && idx === 0 ? caption : undefined,
-              parse_mode: "HTML",
-            })) as any,
+          await withFloodWaitRetry(() =>
+            ctx.api.sendMediaGroup(
+              tenant.chatId,
+              batch.map((it, idx) => ({
+                type: it.kind === "video" ? "video" : "photo",
+                media: new InputFile(it.path),
+                caption: i === 0 && idx === 0 ? caption : undefined,
+                parse_mode: "HTML",
+              })) as any,
+            )
           );
         } catch (error) {
           const errMsg = error instanceof Error ? error.message : String(error);
@@ -211,16 +221,22 @@ export function createThreadsHandler() {
           });
         });
       }
+      if (tenant.settings.featureFlags.duplicateLinks) {
+        await storeLink({
+          tenantId: tenant.tenantId,
+          url,
+          author,
+          dateMs,
+          cache: deps.linkCache,
+          cacheSize: tenant.settings.duplicateLinks.cacheSize,
+        });
+      }
       logger.info("[threadsHandler] Threads media sent successfully", {
         totalMedia: downloaded.length,
       });
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       logger.error("[threadsHandler] Threads download failed", { error: errMsg, url });
-      await ctx.api.sendMessage(
-        tenant.chatId,
-        `Threads download failed: ${errMsg}. This handler currently supports public posts only.`,
-      ).catch(() => { });
       if (progress) {
         await ctx.api.deleteMessage(tenant.chatId, progress.message_id).catch((err) => {
           const cleanupErr = err instanceof Error ? err.message : String(err);
@@ -230,6 +246,17 @@ export function createThreadsHandler() {
           });
         });
       }
+      const userMessage = describeMediaPostFailure(e, "Threads");
+      logger.info("[threadsHandler] explaining failure to chat", { userMessage });
+      await notifyChatAfterError({
+        err: e,
+        send: () => ctx.api.sendMessage(tenant.chatId, userMessage),
+        onSendFailure: (sendErr) => {
+          logger.warn("[threadsHandler] failed to send error notice to chat", {
+            error: sendErr instanceof Error ? sendErr.message : String(sendErr),
+          });
+        },
+      });
     } finally {
       if (tempDir) {
         logger.debug("[threadsHandler] cleaning up temp directory", { tempDir });
